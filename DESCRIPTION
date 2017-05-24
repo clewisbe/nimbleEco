@@ -1,9 +1,10 @@
 Package: nimbleEcology
-Title: What the Package Does (one line, title case)
+Title: Fit Ecological Models Using NIMBLE
 Version: 0.0.0.9000
-Authors@R: person("Colin", "Lewis-Beck", email = "clewisbe@iastate.edu", role = c("aut", "cre"))
-Description: What the package does (one paragraph).
+Authors@R: person("Colin", "Lewis-Beck", email = "clewisbe@iastate.edu", role = c("cre"))
+Description: Dynamically Generates BUGS Code for NIMBLE
 Depends: R (>= 3.2.5)
 License: What license is it under?
 Encoding: UTF-8
 LazyData: true
+Suggests: testthat
