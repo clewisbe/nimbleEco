@@ -1,6 +1,6 @@
 ## Nimble LM Model##
 ## BUGS Code Generation for nimbleCode Object for Linear Model ##
-
+library(nimble)
 library(assertthat) ## to package dependencies
 
 ## Helper Functions ##
@@ -8,6 +8,10 @@ library(assertthat) ## to package dependencies
 ## These Functions Make the Name someFactor.X
 make.effect.name <- function(term) {
   as.name(paste0(term, '.effect'))
+}
+
+make.coef.name <- function(term) {
+  as.name(paste0('b.', term))
 }
 
 make.mean.name <- function(term) {
@@ -19,8 +23,13 @@ make.precision.name <- function(term) {
 }
 
 make.sigma.name <- function(term) {
-  as.name(paste0(term, '.sigma2'))
+  as.name(paste0(term, '.sigma'))
 }
+
+make.pred.name <- function(term) {
+  as.name(paste0(term, '.pred'))
+}
+
 
 
 
@@ -59,7 +68,7 @@ subbars <- function(term)
 fb <- function(term)
 {
   if (is.name(term) || !is.language(term)) return(NULL)
-  if (term[[1]] == as.name("(")) return(fb(term[[2]]))
+  if (identical(term[[1]], as.name("("))) return(fb(term[[2]]))
   stopifnot(is.call(term))
   if (term[[1]] == as.name('|')) return(term)
   if (length(term) == 2) return(fb(term[[2]]))
@@ -126,7 +135,7 @@ anyBars <- function(term) {
 make.prior <- function(term, prior,...){
 
   if (prior=="Normal"){
-  substitute(TERM ~ dnorm(0, 0.0001), list(TERM=term))
+  substitute(TERM ~ dnorm(0, sd=1000), list(TERM=term))
   }
 
   else if (prior=="Uniform"){
@@ -147,8 +156,8 @@ make.prior <- function(term, prior,...){
 }
 
 #Make Normal Prior for Random Effect
-make.random.prior <- function(term, mean, precision){
-  substitute(TERM ~ dnorm(MEAN, PRECISION), list(TERM=term, MEAN=mean, PRECISION=precision))
+make.random.prior <- function(term, mean, sig){
+  substitute(TERM ~ dnorm(MEAN, sd=SD), list(TERM=term, MEAN=mean, SD=sig))
 }
 
 
@@ -209,20 +218,19 @@ formulaRandom2BUGS <- function(term, fr, index.name, intcpt, fixedterms){
 
     if(intcpt==1){
         random <- make.random.prior(LHS2BUGSterm(make.effect.name(term[[3]]), index.name), mean = make.mean.name(term[[3]]),
-                                    precision = make.precision.name(term[[3]]))
+                                    sig = make.sigma.name(term[[3]]))
         prior.mu <- make.prior(make.mean.name(term[[3]]), 0)
         }
     else{
         random <- make.random.prior(LHS2BUGSterm(make.effect.name(term[[3]]), index.name), mean = make.mean.name(term[[3]]),
-                                    precision = make.precision.name(term[[3]]))
+                                    sig = make.sigma.name(term[[3]]))
         prior.mu <- make.prior(make.mean.name(term[[3]]),"Normal")
           }
       random.loop <- embedLinesInForLoop(random, index.name, start = 1, finish = as.numeric(groups))
 
     #Priors
-    prior.var <-  make.prior(make.precision.name(term[[3]]),"Gamma")
-    var.convert <- substitute(y <- 1/x, list(y = make.sigma.name(term[[3]]), x = make.precision.name(term[[3]])))
-    out[[2]] <- embedLinesInCurlyBrackets(list(random.loop, prior.var, var.convert, prior.mu))
+    prior.sd <-  make.prior(make.sigma.name(term[[3]]),"Uniform")
+    out[[2]] <- embedLinesInCurlyBrackets(list(random.loop, prior.sd, prior.mu))
   }
 
   #Random Slope
@@ -237,21 +245,20 @@ formulaRandom2BUGS <- function(term, fr, index.name, intcpt, fixedterms){
 
     if(as.character(term[[2]]) %in% fixedterms){
       random <- make.random.prior(LHS2BUGSterm(make.effect.name(term[[2]]), index.name), mean = make.mean.name(term[[2]]),
-                                  precision = make.precision.name(term[[2]]))
+                                  sig = make.sigma.name(term[[2]]))
       prior.mu <- make.prior(make.mean.name(term[[2]]), 0)
     }
     else{
       random <- make.random.prior(LHS2BUGSterm(make.effect.name(term[[2]]), index.name), mean = make.mean.name(term[[2]]),
-                                  precision = make.precision.name(term[[2]]))
+                                  sig = make.sigma.name(term[[2]]))
       prior.mu <- make.prior(make.mean.name(term[[2]]),"Normal")
     }
 
     random.loop <- embedLinesInForLoop(random, index.name, start = 1, finish = as.numeric(groups))
 
     #Priors
-    prior.var <-  make.prior(make.precision.name(term[[2]]),"Gamma")
-    var.convert <- substitute(y <- 1/x, list(y = make.sigma.name(term[[2]]), x = make.precision.name(term[[2]])))
-    out[[2]] <- embedLinesInCurlyBrackets(list(random.loop, prior.var, var.convert, prior.mu))
+    prior.sd <-  make.prior(make.sigma.name(term[[2]]),"Uniform")
+    out[[2]] <- embedLinesInCurlyBrackets(list(random.loop, prior.sd, prior.mu))
 
   }
 
@@ -261,7 +268,7 @@ formulaRandom2BUGS <- function(term, fr, index.name, intcpt, fixedterms){
 
 
 ##Converts a Term from a Formula to a BUGS Term
-formulaTerm2BUGSterm <- function(term, mf, index.name,id) {
+formulaTerm2BUGSterm <- function(term, mf, index.name) {
   ## term will be a string like "x"
   ## mf will be the model.frame
   ## index.name will be the name of the for-loop index
@@ -270,20 +277,17 @@ formulaTerm2BUGSterm <- function(term, mf, index.name,id) {
   ## Converts Interaction term to BUGS code, e.g. x[i]*y[i]; Need to Expand to take greater than 2 way interactions
   if (length(plyr::ldply(strsplit(term, split = ":"))) > 1){
     inter = plyr::ldply(strsplit(term, split = ":"))
-    beta.no = as.name((paste0(quote(b),id)))
         if(is.factor(mf[[inter[,1]]])){
-          beta.no = as.name((paste0(quote(b),id)))
           out = substitute(EFFECTNAME[TERM[INDEX]]*TERM2[INDEX],
-                           list(EFFECTNAME = as.name(beta.no), #Index Beta's on Covariates
+                           list(EFFECTNAME = make.coef.name(paste0(inter$V1,inter$V2)), #Index Beta's on Covariates
                                 TERM = as.name(inter[,1]),
                                 TERM2 = as.name(inter[,2]),
                                 INDEX = index.name))
           return(out)
         }
         if(is.factor(mf[[inter[,2]]])){
-        beta.no = as.name((paste0(quote(b),id)))
         out = substitute(EFFECTNAME[TERM[INDEX]]*TERM2[INDEX],
-                       list(EFFECTNAME = as.name(beta.no),
+                       list(EFFECTNAME = make.coef.name(paste0(inter$V2,inter$V1)),
                             TERM = as.name(inter[,2]),
                             TERM2 = as.name(inter[,1]),
                             INDEX = index.name))
@@ -295,14 +299,13 @@ formulaTerm2BUGSterm <- function(term, mf, index.name,id) {
                      list(TERM = as.name(inter[,1]),
                      TERM2 = as.name(inter[,2]),
                      INDEX = index.name))}
-    return(make.param.name(beta.no,out))
+    return(make.param.name(make.coef.name(paste0(inter$V1,inter$V2)),out))
   }
 
   if(is.factor(mf[[term]])){
     ## If term is a factor use BUGS indexing create b2[block[i]]
-    beta.no = as.name((paste0(quote(b),id)))
     out = substitute(EFFECTNAME[TERM[INDEX]],  #How to Keep double Brackets without Term Name in Front?
-               list(EFFECTNAME = as.name(beta.no), #was (effect.name)
+               list(EFFECTNAME = make.coef.name(term) , #was (effect.name)
                     TERM = as.name(term),
                     INDEX = index.name))
     return(out)
@@ -313,17 +316,13 @@ formulaTerm2BUGSterm <- function(term, mf, index.name,id) {
                list(TERM = as.name(term),
                     INDEX = index.name))
 
-    beta.no = as.name((paste0(quote(b),id)))
-    make.param.name(beta.no,out)
+    make.param.name(make.coef.name(term),out)
 
 }
 
 
-## This Adds a Prior for Each Parameter on the RHS
-formulaTerm2PRIOR <- function(term, mf, index.name, id, dropbase, prior) {
-  ## term will be a string like "x"
-  ## mf will be the model.frame
-  ## index.name will be the name of the for-loop index
+## This Adds a Prior for Each Fixed Parameter on the RHS
+formulaTerm2PRIOR <- function(term, mf, index.name, dropbase, prior) {
   ##Would be nice (maybe easier?) to Parse apart the RHS language term and define priors from that object?
 
   if(is.factor(mf[[term]])){
@@ -331,54 +330,54 @@ formulaTerm2PRIOR <- function(term, mf, index.name, id, dropbase, prior) {
     out = list()  #Add Each Prior to List Object
 
     groups = nlevels(as.factor(mf[[term]]))  #Drop one group for model identification; Need to add Check if Intercept in Model Too
-    beta.no = as.name(paste0(quote(b),id))
+    #beta.no = as.name(paste0(quote(b),id))
 
     if(dropbase==TRUE){
-      out[[1]] <- make.prior(substitute(beta.no[ID],list(ID=1,beta.no=beta.no)),prior=0)
+      out[[1]] <- make.prior(LHS2BUGSterm(make.coef.name(term), 1), prior=0)
       st = 2
       idx = 2
       }
     else {st=1; idx=1}
 
-    p = make.prior(LHS2BUGSterm(beta.no, index.name), prior)
+    p = make.prior(LHS2BUGSterm(make.coef.name(term), index.name), prior)
     out[[idx]] <- embedLinesInForLoop(p, index.name, start=st, finish=as.numeric(groups))
     return(embedLinesInCurlyBrackets(out))
   }
 
-
-
    #Priors for Interaction Terms with Factor Variable
    if (length(plyr::ldply(strsplit(term, split = ":"))) > 1){
      inter = plyr::ldply(strsplit(term, split = ":"))
-     beta.no = as.name((paste0(quote(b),id)))
+     #beta.no = as.name((paste0(quote(b),id)))
      if(is.factor(mf[[inter[,1]]]) | is.factor(mf[[inter[,2]]])){
 
        out = list()  #Add Each Prior to List Object
 
        groups = max((nlevels(mf[[inter[,1]]])), nlevels(mf[[inter[,2]]]))  #Allow More Than 3  Way Interaction?
-       beta.no = as.name(paste0(quote(b),id))
+       #beta.no = as.name(paste0(quote(b),id))
 
        if(dropbase==TRUE){
-         out[[1]] <- make.prior(substitute(beta.no[ID], list(ID=1,beta.no=beta.no)), prior=0)
+         out[[1]] <- make.prior(LHS2BUGSterm(make.coef.name(paste0(inter$V1,inter$V2)), 1), prior=0)
          st = 2
          idx = 2
        }
        else {st = 1; idx = 1}
 
-       p = make.prior(LHS2BUGSterm(beta.no, index.name), prior)
+       p = make.prior(LHS2BUGSterm(make.coef.name(paste0(inter$V1,inter$V2)), index.name), prior)
        out[[idx]] <- embedLinesInForLoop(p, index.name, start=st, finish=as.numeric(groups))
 
        return(embedLinesInCurlyBrackets(out))
+      }
 
-     }
 
+   else {
+     out = make.prior(make.coef.name(paste0(inter$V1,inter$V2)), prior)
+        }
+   }
+   else{
+     out = make.prior(make.coef.name(term), prior)
    }
 
-   else
-     beta.no = as.name((paste0(quote(b), id)))
-     out = make.prior(beta.no, prior)
-   return(out)
-
+  return(out)
 }
 
 
@@ -429,12 +428,14 @@ nimble.lm <- function(mod, dat=NULL, family=c("Normal"), priors=c("Normal","t","
 
   index.name <- quote(i)
 
+
   #Likelihood
 
   #Generate mean function mu[i]
   if (family=="Normal"){
-    meanfcn <- quote(dnorm(mu[i],tau))}  #could change to other disributions later on
-    dep <- LHS2BUGSterm(mf$formula[[2]], index.name)
+    meanfcn <- substitute(dnorm(MEAN, sd=SIGMA), list(MEAN=LHS2BUGSterm(make.mean.name(RHSForm(mf$formula[2])), index.name),
+                SIGMA=quote(sigma)))}  #could change to other disributions later on
+    dep <- LHS2BUGSterm(make.pred.name(mf$formula[[2]]), index.name)
     meanfctn <-  substitute(LHS ~ RHS, list(LHS = dep, RHS = meanfcn))
 
     #Pull out Fixed Terms
@@ -447,6 +448,7 @@ nimble.lm <- function(mod, dat=NULL, family=c("Normal"), priors=c("Normal","t","
     RandomParms <- list()
     RandomPriors <- list()
 
+
     #Generate Random Terms and Priors First
     if(!is.null(randomTerms)){
       for (i in 1:length(randomTerms)){
@@ -458,24 +460,21 @@ nimble.lm <- function(mod, dat=NULL, family=c("Normal"), priors=c("Normal","t","
   #Add Fixed Effect Terms
   assert_that(length(terms.to.add) > 0 | length(randomTerms) > 0)
 
-
-
   ## Check for Overal Model Intercept
   if (int.add==1){
       RHS <- quote(b0)
       ## append additional terms
       for(iTerm in seq_along(terms.to.add)) {
-        RHS <- addTerm(RHS, formulaTerm2BUGSterm(terms.to.add[iTerm], fr, index.name, id = iTerm))
+        RHS <- addTerm(RHS, formulaTerm2BUGSterm(terms.to.add[iTerm], fr, index.name))
     }
   }
 
   if(int.add==0 & length(terms.to.add) > 0){
-    RHS <- formulaTerm2BUGSterm(terms.to.add[1], fr, index.name, id = 1)
+    RHS <- formulaTerm2BUGSterm(terms.to.add[1], fr, index.name)
     for(iTerm in seq_along(terms.to.add[-1]) + 1){
-      RHS <- addTerm(RHS, formulaTerm2BUGSterm(terms.to.add[iTerm], fr, index.name, id = iTerm))
+      RHS <- addTerm(RHS, formulaTerm2BUGSterm(terms.to.add[iTerm], fr, index.name))
     }
   }
-
 
   #Add Back in Random Terms; Need Check if There are No Fixed Terms Or Intercept Though to Define RHS
   if(!is.null(randomTerms) & exists("RHS")){
@@ -492,8 +491,8 @@ nimble.lm <- function(mod, dat=NULL, family=c("Normal"), priors=c("Normal","t","
   }
 
   #Make Term for mean function, mu
-  LHS <- LHS2BUGSterm(quote(mu), index.name)
-  fullLine <- substitute(LHS ~ RHS, list(LHS = LHS, RHS = RHS))
+  LHS <- LHS2BUGSterm(make.mean.name(RHSForm(mf$formula[2])), index.name)
+  fullLine <- substitute(LHS <- RHS, list(LHS = LHS, RHS = RHS))
   lines <- list(meanfctn, fullLine) ## could have potentially more
   forLoop <- embedLinesInForLoop(lines, index.name, start = 1, finish = as.numeric(dim(fr)[1])) ## num.data will have to be figured out
 
@@ -504,21 +503,18 @@ nimble.lm <- function(mod, dat=NULL, family=c("Normal"), priors=c("Normal","t","
   priorsList <- list()
 
   #Prior for Variance Term, could allow options for this later
-  priorsList[[1]] <-  quote(tau ~ dgamma(0.001, 0.001))
-  priorsList[[2]] <-  quote(sigma2 <- 1/tau)
-
+  priorsList[[1]] <-  quote(sigma ~ dunif(0, 1000))
 
   #Priors for Beta Terms
   #Have a List of Index IDs to loop Over.  Is using same index for loops a good idea?
   for(iTerm in seq_along(terms.to.add)) {
-    priorsList[[iTerm + 2]] <- formulaTerm2PRIOR(terms.to.add[iTerm], fr, index.name, id = iTerm, dropbase, prior = priors)
+    priorsList[[iTerm + 1]] <- formulaTerm2PRIOR(terms.to.add[iTerm], fr, index.name, dropbase, prior = priors)
   }
 
   #Add in Random Effect Priors
   if (length(RandomPriors) > 0){
     priorsList[[length(priorsList) + 1]] <- embedLinesInCurlyBrackets(RandomPriors)
   }
-
 
   #Add Prior for Intercept
   if(int.add==1){
@@ -537,14 +533,40 @@ nimble.lm <- function(mod, dat=NULL, family=c("Normal"), priors=c("Normal","t","
 sillyData <- list(z = rpois(10,2), q=rnorm(10), xm = rnorm(10), ym=rgamma(10,3), A = c(rep('Red',7), rep('Orange',1), rep('Blue', 2)))
 
 #debug(nimble.lm)
-
-
-#Allow for Change in Slopes
-
-test <- nimble.lm(mod = z ~ A + (xm|A), dat = sillyData, priors="Normal", dropbase=TRUE)
+test <- nimble.lm(mod = z ~ xm + A, dat = sillyData, priors="Normal", dropbase=TRUE)
 
 test
 
-## suggest writing unit tests with testthat hand-in-hand with code development
-##Start on Unit Tests.  How to set up for code generation?
+##Run in NIMBLE to Check if There are NAMESPACE ISSUES
 
+inits <- list(sigma=1, b.xm = 1, b.A=c(1,1,1), b0 = 1)
+
+dat <- list(z.pred=sillyData$z)
+
+#Make A a Numeric
+A.num <-as.numeric(as.factor(sillyData$A))
+
+cont <- list(xm=sillyData$xm, A=A.num)
+
+
+silly <- nimbleModel(code=test, name="mod1", inits=inits, constants=cont, data=dat)
+silly$plotGraph()
+Csilly <- compileNimble(silly)
+
+#Set Up MCMC
+sillyConf <- configureMCMC(silly, print = TRUE)
+sillyMCMC <- buildMCMC(sillyConf)
+CsillyMCMC <- compileNimble(sillyMCMC, project = silly)
+niter <- 10000
+set.seed(1)
+CsillyMCMC$run(niter)
+
+#Look at Samples
+samples <- as.matrix(CsillyMCMC$mvSamples)
+plot(samples[ , "b.A[3]"], type = "l", xlab = "iteration",
+     ylab = expression(sigma))
+
+median(samples[,2])
+
+#Check with lm function
+mod <- lm(z ~ xm + A, data=sillyData)
