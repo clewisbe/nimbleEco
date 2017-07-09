@@ -3,6 +3,7 @@ library(nimble)
 #library(devtools)
 #install_github("nimble-dev/nimble", ref = "devel", subdir = "packages/nimble")
 library(tidyverse)
+library(coda)
 nimbleOptions(enableBUGSmodules = TRUE)
 
 makeBUGSmodule <- function( fun ) {
@@ -10,40 +11,7 @@ makeBUGSmodule <- function( fun ) {
   ans
 }
 
-## Make Tidy Data From 3 Abundance Data Sets ##
-maketidy <- function(y, sitevars, obsvars){
-  final.df <- list()
-
-  L = dim(y)[2]
-  VisitID <- paste("Visit", 1:L, sep="")
-  colnames(y) <- VisitID
-  y$Site <- as.numeric(rownames(y))
-  long.y <- gather(y, Visit, Count, 1:L)
-
-  #Site Variables
-  sitevars$Site <- as.numeric(rownames(sitecov))
-
-  #Check Dimensions
-  if(dim(y)[1] != dim(sitevars)[1]) {stop('Number of Rows of Y and Site Variables Do Not Match')}
-
-  #Join Response with Site Level Variables
-  final.df[[1]] <- left_join(long.y, sitevars, by = "Site")
-
-  #Combine Observation Level Data
-  varnames.obs <- names(obscov)
-
-  for (i in seq_along(obscov)){
-    mf = as.data.frame(obscov[[i]])
-    if(L != dim(mf)[2]){stop('Number of Visits of Y and Obs Covariate Variables Do Not Match')}
-    colnames(mf) <- VisitID
-    mf$Site <- as.numeric(rownames(mf))
-    final.df[[i + 1]] <- gatherfctn(mf, "Visit", varnames.obs[i], 1:L)
-  }
-
-  return(Reduce(function(dtf1,dtf2) left_join(dtf1,dtf2,by=c("Site", "Visit")), final.df))
-}
-
-
+#Helper function to gather data
 gatherfctn <- function(mydata, key.col, val.col, gather.cols) {
   new.data <- gather_(data = mydata,
                       key_col = key.col,
@@ -51,6 +19,53 @@ gatherfctn <- function(mydata, key.col, val.col, gather.cols) {
                       gather_cols = colnames(mydata)[gather.cols])
   return(new.data)
 }
+
+
+## Make Tidy Data From 3 Abundance Data Sets ##
+## y is matrix, sitevars is matrix, obsvars is named list
+maketidy <- function(y, sitevars = NULL, obsvars = NULL){
+  final.df <- list()
+
+  if(is.null(y)) {stop('Count Data is Required')}
+  y <- as.data.frame(y)
+  L = dim(y)[2]
+  VisitID <- paste("Visit", 1:L, sep="")
+  colnames(y) <- VisitID
+  y$Site <- as.numeric(rownames(y))
+  long.y <- gather(y, Visit, Count, 1:L)
+
+
+  #Site Variables
+  if (!is.null(sitevars)){
+    sitevars <- as.data.frame(sitevars)
+    sitevars$Site <- as.numeric(rownames(sitevars))
+
+  #Check Dimensions
+  if(dim(y)[1] != dim(sitevars)[1]) {stop('Number of Rows of Y and Site Variables Do Not Match')}
+
+  #Join Response with Site Level Variables
+  final.df[[1]] <- left_join(long.y, sitevars, by = "Site")
+  }
+
+  else{
+    final.df[[1]] <- long.y
+  }
+
+  #Combine Observation Level Data
+  if (!is.null(obsvars)){
+    varnames.obs <- names(obsvars)
+
+    for (i in seq_along(obsvars)){
+      mf = as.data.frame(obsvars[[i]])
+      if(L != dim(mf)[2]){stop('Number of Visits of Y and Obs Covariate Variables Do Not Match')}
+      colnames(mf) <- VisitID
+      mf$Site <- as.numeric(rownames(mf))
+      final.df[[i + 1]] <- gatherfctn(mf, "Visit", varnames.obs[i], 1:L)
+      }
+  }
+  return(Reduce(function(dtf1,dtf2) left_join(dtf1,dtf2,by=c("Site", "Visit")), final.df))
+}
+
 
 
 ## BUGS Code Generation Helper Functions ##
@@ -61,12 +76,27 @@ LHS2BUGSterm <- function(LHScode, indexName) {
 }
 
 #Make the Name X.effect/mu/tau
-make.effect.name <- function(term) {
-  as.name(paste0(term, '.effect'))
+make.effect.name <- function(term, level) {
+  if (level == site){
+  as.name(paste0(term, '.effect.s'))
+  }
+  else{
+  as.name(paste0(term, '.effect.o'))
+  }
 }
 
-make.coef.name <- function(term) {
-  as.name(paste0('b.', term))
+#To avoid repeated names, seperate naming for Site and Obs level parameters
+make.coef.name <- function(term, level) {
+  if (as.character(level) == "site"){
+    as.name(paste0('s.', term))
+  }
+  else{
+  as.name(paste0('o.', term))
+  }
+}
+
+make.coef.obs <- function(term) {
+  as.name(paste0('o.', term))
 }
 
 make.mean.name <- function(term) {
@@ -102,7 +132,7 @@ make.prior <- function(term, prior,...){
   }
 
   else if (prior=="Uniform"){
-    substitute(TERM ~ dunif(0, 1000), list(TERM=term))
+    substitute(TERM ~ dunif(0, 1), list(TERM=term))
   }
 
   else if (prior=="t"){
@@ -134,7 +164,7 @@ factor.bracket <- function(term, df){
   }
 }
 
-#Pulls out formula from mf
+#Pulls out formula from model frame
 RHSForm <- function(form, as.form=FALSE){
   rhsf <- form[[length(form)]]
   if (as.form) reformulate(deparse(rhsf)) else rhsf
@@ -287,17 +317,18 @@ fb <- function(term)
 }
 
 #Make nim_glm object to pass to BUGS Module for Processing
-make.glm <- function(RHS, factors = NULL, cl, mixture, link, N = NULL, Site = NULL){
+make.glm <- function(RHS, factors = NULL, cl, mixture, link, N = NULL, Site = NULL, level = NULL){
   RHS.out <- call("nim_glm", RHSForm(RHS))
   RHS.out[[3]] <- factors
   RHS.out[[4]] <- as.name(cl$priors)
   RHS.out[[5]] <- cl$dropbase
   RHS.out[[6]] <- mixture
   RHS.out[[7]] <- link
-  names(RHS.out)[3:7] <- c("factors", "priors","dropbase", "family", "link")
-  if (mixture=="Binomial"){
-    RHS.out[[8]] <- list(N, Site)
-    names(RHS.out)[8] <- c("args")
+  RHS.out[[8]] <- level
+  names(RHS.out)[3:8] <- c("factors", "priors","dropbase", "family", "link", "level")
+  if (mixture %in% c("Binomial", "Bernoulli")){
+    RHS.out[[9]] <- list(N, Site)
+    names(RHS.out)[9] <- c("args")
   }
   return(RHS.out)
 }
@@ -306,12 +337,12 @@ make.glm <- function(RHS, factors = NULL, cl, mixture, link, N = NULL, Site = NU
 #Returns Full Code, LHS, RHS, and the Probability Model
 nim_glm <- makeBUGSmodule(
   function(LHS, RHS) {
-    RHSargs <- match.call(function(mod, factors, priors, family, link, dropbase, args){}, RHS)
+    RHSargs <- match.call(function(mod, factors, priors, family, link, dropbase, level, args){}, RHS)
 
     #Set Up LHS
     index.name <- quote(i)
 
-    if (RHSargs$family =="Poisson") {distn <- quote(dpois); link = quote(log); param = quote(lambda);
+    if (RHSargs$family %in% c("Poisson", "NB", "ZIP", "Bernoulli")) {distn <- quote(dpois); link = quote(log); param = quote(lambda);
         pred.d <- substitute(DIST(PARAM), list(DIST = distn, PARAM=LHS2BUGSterm(param, index.name)))
     }
 
@@ -320,34 +351,77 @@ nim_glm <- makeBUGSmodule(
           N = bracket(RHSargs$args[[1]],bracket(RHSargs$args[[2]],quote(i)))))
     }
 
-
     meanfctn <-  substitute(LHS ~ RHS, list(LHS = LHS2BUGSterm(LHS[[2]], index.name), RHS = pred.d))
     meanfctn.loop <- embedLinesInForLoop(meanfctn, index.name, start = 1, finish=LHS[[3]][[3]])
+
+    if (RHSargs$family =="NB"){
+      dispersion <- substitute(LAMBDA <- MU*DISP, list(LAMBDA = LHS2BUGSterm(param, index.name), DISP = LHS2BUGSterm(quote(rho), index.name),
+                                                       MU = LHS2BUGSterm(quote(mu), index.name)))
+      rho.dist <- substitute(X ~ dgamma(alpha, alpha), list(X = LHS2BUGSterm(quote(rho), index.name)))
+      meanfctn.no.prior <- embedLinesInForLoop(list(meanfctn, dispersion, rho.dist), index.name, start = 1, finish=LHS[[3]][[3]])
+
+      rho.param <- substitute(ALPHA <- exp(LOGALPHA), list(ALPHA = quote(alpha), LOGALPHA = quote(logalpha)))
+      rho.prior <- make.prior(quote(logalpha), "Normal")
+
+      meanfctn.loop <- embedLinesInCurlyBrackets(list(rho.prior, rho.param, meanfctn.no.prior))
+    }
+
+    if (RHSargs$family =="ZIP"){
+      zip <- substitute(S ~ dbern(THETA), list(S = LHS2BUGSterm(quote(s), index.name), THETA = quote(theta)))
+      zip.prior <- make.prior(quote(theta), "Uniform")
+      distn <- quote(dpois); link = quote(log); param = quote(lambda);
+      pred.d <- substitute(DIST(PARAM*ZIP), list(DIST = distn, PARAM=LHS2BUGSterm(param, index.name), ZIP = LHS2BUGSterm(quote(s), index.name)))
+      meanfctn <-  substitute(LHS ~ RHS, list(LHS = LHS2BUGSterm(LHS[[2]], index.name), RHS = pred.d))
+      meanfctn.no.prior <- embedLinesInForLoop(list(meanfctn, zip), index.name, start = 1, finish=LHS[[3]][[3]])
+      meanfctn.loop <- embedLinesInCurlyBrackets(list(zip.prior, meanfctn.no.prior))
+    }
+
+    if (RHSargs$family =="Bernoulli"){
+      if(RHSargs$level == quote(site)){
+        param <- quote(psi)
+        presence <- substitute(dbern(PSI), list(PSI = LHS2BUGSterm(param, index.name)))
+      }
+      if(RHSargs$level == quote(obs)){
+        param <- quote(p)
+        presence <- substitute(dbern(Z*P), list(Z = bracket(quote(z), bracket(RHSargs$args[[2]],quote(i))), P = LHS2BUGSterm(param, index.name)))
+      }
+      meanfctn <-  substitute(LHS ~ RHS, list(LHS = LHS2BUGSterm(LHS[[2]], index.name), RHS = presence))
+      meanfctn.loop <- embedLinesInForLoop(meanfctn, index.name, start = 1, finish=LHS[[3]][[3]])
+    }
 
     #Set up RHS
     lpred <- call("lmPred", RHSargs$mod)
     lpred[[3]] <- RHSargs$factors
     lpred[[4]] <- RHSargs$priors
-    lpred[[5]] <- link
+    lpred[[5]] <- as.name(RHSargs$link)
     lpred[[6]] <- RHSargs$dropbase
-    names(lpred)[3:6] <- c("factors", "priors", "link", "dropbase")
+    lpred[[7]] <- RHSargs$level
+    names(lpred)[3:7] <- c("factors", "priors", "link", "dropbase", "level")
+
+    if (RHSargs$family =="NB"){
+    lpred.full <- substitute(LHS <- RHS, list(LHS = bracket(quote(mu), LHS[[3]]), RHS = lpred))
+    LHS.Param <- bracket(quote(mu), LHS[[3]])
+    }
+
+    else{
     lpred.full <- substitute(LHS <- RHS, list(LHS = bracket(param, LHS[[3]]), RHS = lpred))
+    LHS.Param <- bracket(param, LHS[[3]])
+    }
 
     #Return Code
     newCode <- embedLinesInCurlyBrackets(lines = list(meanfctn.loop, lpred.full))
-    return(list(code = newCode, LHS = bracket(param, LHS[[3]]), RHS = lpred, prob.mod = meanfctn.loop))
+    return(list(code = newCode, LHS = LHS.Param, RHS = lpred, prob.mod = meanfctn.loop))
   })
 
 
 #Takes Term from lmPred and Converts it to a BUGS Term
 #Note: : is not supported for interaction term, just *
-lmPred2BUGSterm <- function(term, factors, index.name) {
+lmPred2BUGSterm <- function(term, factors, index.name, level) {
 
   factors.name <- lapply(factors, removeIndexing)
   factors.name <- unlist(lapply(factors.name, '[[',2))
-
   if(term=="1"){
-    return(make.coef.name(quote(intercept)))
+    return(make.coef.name(quote(intercept), level))
   }
 
   if (length(strsplit(term, '*', fixed = TRUE)[[1]]) == 2){
@@ -355,7 +429,7 @@ lmPred2BUGSterm <- function(term, factors, index.name) {
 
     if(interaction[1] %in% factors.name & !(interaction[2] %in% factors.name)){
       out = substitute(EFFECTNAME[TERM[INDEX]]*TERM2[INDEX],
-                       list(EFFECTNAME = make.effect.name(paste0(interaction[1],interaction[2])), #Index Beta's on Covariates
+                       list(EFFECTNAME = make.effect.name(paste0(interaction[1],interaction[2]), level), #Index Beta's on Covariates
                             TERM = as.name(interaction[1]),
                             TERM2 = as.name(interaction[2]),
                             INDEX = index.name))
@@ -364,7 +438,7 @@ lmPred2BUGSterm <- function(term, factors, index.name) {
 
     if(interaction[2] %in% factors.name & !(interaction[1] %in% factors.name)){
       out = substitute(EFFECTNAME[TERM[INDEX]]*TERM2[INDEX],
-                       list(EFFECTNAME = make.effect.name(paste0(interaction[1], interaction[2])),
+                       list(EFFECTNAME = make.effect.name(paste0(interaction[1], interaction[2]), level),
                             TERM = as.name(interaction[2]),
                             TERM2 = as.name(interaction[1]),
                             INDEX = index.name))
@@ -373,7 +447,7 @@ lmPred2BUGSterm <- function(term, factors, index.name) {
 
     if(all(interaction %in% factors.name)){
       out = substitute(EFFECTNAME[TERM[INDEX], TERM2[INDEX]],
-                       list(EFFECTNAME = make.effect.name(paste0(interaction[1], interaction[2])),
+                       list(EFFECTNAME = make.effect.name(paste0(interaction[1], interaction[2]), level),
                             TERM = as.name(interaction[2]),
                             TERM2 = as.name(interaction[1]),
                             INDEX = index.name))
@@ -381,7 +455,7 @@ lmPred2BUGSterm <- function(term, factors, index.name) {
     }
     else{
       out = substitute(EFFECTNAME*TERM[INDEX]*TERM2[INDEX],
-                       list(EFFECTNAME = make.coef.name(paste0(interaction[1], interaction[2])),
+                       list(EFFECTNAME = make.coef.name(paste0(interaction[1], interaction[2]), level),
                             TERM = as.name(interaction[1]),
                             TERM2 = as.name(interaction[2]),
                             INDEX = index.name))
@@ -392,7 +466,7 @@ lmPred2BUGSterm <- function(term, factors, index.name) {
     if (length(strsplit(term, '*', fixed = TRUE)[[1]])  > 2){
       interaction = unlist(strsplit(term, '*', fixed=TRUE))
 
-      tm.name <- make.coef.name(paste(interaction, collapse = ""))
+      tm.name <- make.coef.name(paste(interaction, collapse = ""), level)
 
       if(interaction[1] %in% factors){
         out = substitute(EFFECTNAME[TERM[INDEX]],
@@ -415,7 +489,7 @@ lmPred2BUGSterm <- function(term, factors, index.name) {
   if(term %in% factors.name){
     ## If term is a factor use BUGS indexing create b2[block[i]]
     out = substitute(EFFECTNAME[TERM[INDEX]],  #How to Keep double Brackets without Term Name in Front?
-                     list(EFFECTNAME = make.effect.name(term) , #was (effect.name)
+                     list(EFFECTNAME = make.effect.name(term, level),
                           TERM = as.name(term),
                           INDEX = index.name))
     return(out)
@@ -426,12 +500,12 @@ lmPred2BUGSterm <- function(term, factors, index.name) {
                      list(TERM = as.name(term),
                           INDEX = index.name))
 
-  make.param.name(make.coef.name(term),out)}
+  make.param.name(make.coef.name(term, level),out)}
 
 }
 
 #lmPred to BUGS Expansion for Random Effect Term
-lmPred2BUGSRandom <- function(termparen, factors, index.name){
+lmPred2BUGSRandom <- function(termparen, factors, index.name, level){
 
   term <- removeParen(termparen)
 
@@ -442,7 +516,7 @@ lmPred2BUGSRandom <- function(termparen, factors, index.name){
   if(term[[1]]==1 & removeIndexing(term[[2]]) %in% factors.name){
 
     out = substitute(EFFECTNAME[TERM[INDEX]],  #How to Keep double Brackets without Term Name in Front?
-                     list(EFFECTNAME = make.coef.name(removeIndexing(term[[2]])), #was (effect.name)
+                     list(EFFECTNAME = make.coef.name(removeIndexing(term[[2]]), level), #was (effect.name)
                           TERM = as.name(removeIndexing(term[[2]])),
                           INDEX = index.name))
   }
@@ -450,7 +524,7 @@ lmPred2BUGSRandom <- function(termparen, factors, index.name){
   #Random Slope
   if (removeIndexing(term[[1]]) != 1 & removeIndexing(term[[2]]) %in% factors.name){
     out = substitute(EFFECTNAME[TERM[INDEX]]*TERM2,
-                     list(EFFECTNAME = make.effect.name(paste0(term[1], term[2])),
+                     list(EFFECTNAME = make.effect.name(paste0(term[1], term[2]), level),
                           TERM = as.name(removeIndexing(term[[2]])),
                           TERM2 = LHS2BUGSterm(as.name(removeIndexing(term[[1]])), index.name),
                           INDEX = index.name))
@@ -464,7 +538,6 @@ lmPred2BUGSRandom <- function(termparen, factors, index.name){
 #Make Prior for fixed Term
 lmPredTerm2PRIOR <- function(term, RHSname, factors, index.name, prior, dropbase, int.check){
   priors = list()
-  initial = list()
 
   factors.name <- lapply(factors, removeIndexing)
   factors.name <- unlist(lapply(factors.name, '[[',2))
@@ -494,7 +567,9 @@ lmPredTerm2PRIOR <- function(term, RHSname, factors, index.name, prior, dropbase
 
     p = make.prior(LHS2BUGSterm(param.name, index.name), prior)
     priors[[idx]] <- embedLinesInForLoop(p, index.name, start = st, finish = groups)
-    initial[[1]] <- cbind(as.character(param.name), groups)
+    initial <- list(groups)
+    names(initial) <- quote(param.name)
+    #initial[[1]] <- cbind(as.character(param.name), groups)
     return(c(embedLinesInCurlyBrackets(priors), initial))
   }
 
@@ -534,20 +609,25 @@ lmPredTerm2PRIOR <- function(term, RHSname, factors, index.name, prior, dropbase
 
       p = make.prior(LHS2BUGSterm(param.name, index.name), prior)
       priors[[idx]] <- embedLinesInForLoop(p, index.name, start=st, finish = groups)
-      initial[[1]] <- cbind(as.character(param.name), groups)
+      initial <- list(groups)
+      names(initial) <- quote(param.name)
       return(c(embedLinesInCurlyBrackets(priors), initial))
     }
 
       else{
         priors = make.prior(param.name, prior)
-        initial[[1]] = cbind(as.character(param.name), 1)
+        initial = list(1)
+        names(initial) <- quote(param.name)
+        #initial[[1]] = cbind(as.character(param.name), 1)
         return(c(priors, initial))
       }
   }
 
     else{
       priors = make.prior(param.name, prior)
-      initial[[1]] = cbind(as.character(param.name), 1)
+      initial = list(1)
+      names(initial) <- quote(param.name)
+      #initial[[1]] = cbind(as.character(param.name), 1)
       return(c(priors, initial))
       }
 }
@@ -556,7 +636,6 @@ lmPredTerm2PRIOR <- function(term, RHSname, factors, index.name, prior, dropbase
 lmPredRandom2PRIOR<- function(termparen, RHSname, factors, index.name, prior, dropbase, int.check){
 
   priors = list()
-  initial = list()
 
   factors.name <- lapply(factors, removeIndexing)
   factors.name <- unlist(lapply(factors.name, '[[',2))
@@ -584,7 +663,9 @@ lmPredRandom2PRIOR<- function(termparen, RHSname, factors, index.name, prior, dr
     #Priors
     prior.sd <-  make.prior(make.sigma.name(param.name),"Uniform")
     priors <- embedLinesInCurlyBrackets(list(random.loop, prior.sd, prior.mu))
-    initial[[1]] <-cbind(as.character(make.sigma.name(param.name)), 1, as.character(make.mean.name(param.name)), 1 )
+    initial <- list(1,1)
+    initial <- setNames(initial, c(as.character(make.sigma.name(param.name)), as.character(make.mean.name(param.name))))
+    #initial[[1]] <-cbind(as.character(make.sigma.name(param.name)), 1, as.character(make.mean.name(param.name)), 1 )
     return(c(priors, initial))
   }
 
@@ -599,7 +680,9 @@ lmPredRandom2PRIOR<- function(termparen, RHSname, factors, index.name, prior, dr
     #Priors
     prior.sd <-  make.prior(make.sigma.name(param.name),"Uniform")
     priors <- embedLinesInCurlyBrackets(list(random.loop, prior.sd, prior.mu))
-    initial[[1]] <- c(as.character(make.sigma.name(param.name)), 1, as.character(make.mean.name(param.name)), 1)
+    initial <- list(1,1)
+    initial <- setNames(initial, c(as.character(make.sigma.name(param.name)), as.character(make.mean.name(param.name))))
+    #initial[[1]] <- c(as.character(make.sigma.name(param.name)), 1, as.character(make.mean.name(param.name)), 1)
     return(c(priors, initial))
   }
 }
@@ -610,15 +693,15 @@ lmPredRandom2PRIOR<- function(termparen, RHSname, factors, index.name, prior, dr
 lmPredictor <- makeBUGSmodule(
   function(LHS, RHS) {
 
-    RHSargs <- match.call(function(RHSmodel, factors, priors, family, link, dropbase){}, RHS)
+    RHSargs <- match.call(function(RHSmodel, factors, priors, family, link, level, dropbase){}, RHS)
 
-    link <- match.arg(as.character(RHSargs$link), c("Identity", "log", "logit", "Poisson", "Bernoulli"))
+    link <- match.arg(as.character(RHSargs$link), c("identity", "log", "logit", "Poisson", "Bernoulli"))
 
     LHS.Index <- bracket(as.name(removeIndexing(LHS)[[2]]), quote(i))
 
 
     #LHS with Link
-    if(link == 'Identity') {
+    if(link == 'identity') {
       LHS.out <- LHS.Index
     }
 
@@ -659,7 +742,7 @@ lmPredictor <- makeBUGSmodule(
     Priors.fix <- list()
 
     for(iTerm in seq_along(RHS.fix.tm)){
-      RHS.fix[[iTerm]] <- lmPred2BUGSterm(RHS.fix.tm[[iTerm]], RHSargs$factors, index.name)
+      RHS.fix[[iTerm]] <- lmPred2BUGSterm(RHS.fix.tm[[iTerm]], RHSargs$factors, index.name, RHSargs$level)
       Priors.fix[[iTerm]] <- lmPredTerm2PRIOR(RHS.fix.tm[[iTerm]], RHS.fix[iTerm], factors = RHSargs$factors, index.name, prior = RHSargs$priors,
                                              dropbase = RHSargs$dropbase, int.check = int.check)
     }
@@ -668,15 +751,19 @@ lmPredictor <- makeBUGSmodule(
     RHS.random <- list()
     Priors.random <- list()
     for(iTerm in seq_along(RHS.random.tm)){
-      RHS.random[[iTerm]] <- lmPred2BUGSRandom(RHS.random.tm[[iTerm]], RHSargs$factors, index.name)
+      RHS.random[[iTerm]] <- lmPred2BUGSRandom(RHS.random.tm[[iTerm]], RHSargs$factors, index.name, RHSargs$level)
       Priors.random[[iTerm]] <- lmPredRandom2PRIOR(RHS.random.tm[[iTerm]], RHS.random[iTerm], factors = RHSargs$factors, index.name, prior = RHSargs$priors,
                                                  dropbase = RHSargs$dropbase, int.check = int.check)
     }
 
+
     Priors.Combo <- append(lapply(Priors.fix, '[[', 1), lapply(Priors.random, '[[', 1))
     Terms.Combo <- append(RHS.fix, RHS.random)
-    Initial.Values <- append(lapply(Priors.fix, '[[', 2), lapply(Priors.random, '[[', 2))
 
+    #Initial.Values <- append(lapply(Priors.fix, '[[', 2), lapply(Priors.random, '[[', 2))
+    Inits.Fix <- sapply(Priors.fix, function(x) x[2])
+    Inits.Random <- append(sapply(Priors.random, function(x) x[2]), sapply(Priors.random, function(x) x[3]))
+    Inits.All <- append(Inits.Fix, Inits.Random)
 
     RHS2 <- Terms.Combo[[1]]
     for (i in seq_along(Terms.Combo)[-1]){
@@ -690,7 +777,7 @@ lmPredictor <- makeBUGSmodule(
 
     newCode <- embedLinesInCurlyBrackets(list(forLoop, Priors.All))
 
-    return(list(code = newCode, inits = Initial.Values))
+    return(list(code = newCode, inits = Inits.All))
   })
 
 
@@ -705,21 +792,53 @@ make.init <- function(term, initialvalue, size){
 
 
 lmPred2init <- function(term, value){
-  if(length(term) == 2){
-    return(make.init((term[[1]]), value, as.numeric(term[[2]])))
+    out = rep(value, term)
+    term <- out
+    return(term)
   }
 
-  else{
-    t1 <- make.init((term[[1]]), value, as.numeric(term[[2]]))
-    t2 <- make.init((term[[3]]), value, as.numeric(term[[4]]))
-    return(list(t1,t2))
-  }
+## Functions that Interact with NIMBLE ##
 
+#Call Nimble and Pass the BUGS code and data
+callNim <- function(modobj, niter, burn, chains){
+  nimMod.C <- compileNimble(modobj)
+
+  #Set Up MCMC
+  config.Mod <- configureMCMC(nimMod.C, print = TRUE)
+  mod.MCMC <- buildMCMC(config.Mod)
+  C.mod.MCMC <- compileNimble(mod.MCMC)
+  samplesList <- runMCMC(C.mod.MCMC, niter = niter, nburnin = burn, nchains = chains, returnCodaMCMC = TRUE)
+  return(samplesList)
 }
+
+
+
+#Take the MCMC samples and return summary statistics
+makeoutput <- function(codaobj, sitevars, obsvars){
+  quantile <- summary(codaobj)$quantiles
+  meansd <- summary(codaobj)$statistics[,1:2]
+
+  #Back Transform Site and Obs Estimates
+  #out.names <- names(quantile[,1])
+  #site.match <- exp(quantile[match(sitevars, out.names), drop = FALSE,])
+  #obs.match <-  exp(quantile[match(obsvars, out.names), drop = FALSE,])/(1 + exp(quantile[match(obsvars, out.names), drop = FALSE,]))
+  #rownames(site.match) <- paste0("exp.", sitevars)
+  #rownames(obs.match) <- paste0("inv.logit.", obsvars)
+  #quantile.adj <- rbind(obs.match, site.match)
+
+
+  rhat <- tryCatch(gelman.diag(codaobj)$psrf, error = function(e) NA)
+  Effsamp <- effectiveSize(codaobj)
+  output  <- as.data.frame(cbind(meansd, quantile, rhat, Effsamp))
+  names(output)[names(output) == 'Point est.'] <- 'Rhat'
+  output$`Upper C.I.`<-NULL
+  return(list(output))
+}
+
 
 ## Main Function for Abundance N Mixture Models ##
 nimble.abund <- function(siteformula = NULL, obsformula = NULL, y = NULL, sitevars = NULL, obsvars = NULL, mixture = c("Poisson", "ZIP", "NB"),
-                         priors = c("Normal","t","Uniform"),dropbase = TRUE, niter = 10000, burnin = 1000, initmcmc = 1, chains = 1,
+                         priors = c("Normal","t","Uniform"), dropbase = TRUE, niter = 10000, burnin = 1000, initmcmc = 1, chains = 1,
                          returncode = FALSE, returnsamp = FALSE){
   cl <- match.call()
   mf <- match.call(expand.dots = FALSE)
@@ -728,6 +847,7 @@ nimble.abund <- function(siteformula = NULL, obsformula = NULL, y = NULL, siteva
   stateform <- as.formula(mf$siteformula)
 
   df <- maketidy(y, sitevars, obsvars) #turn 3 data pieces into one tiny data frame
+
 
   #Length of Long DF
   L <- as.numeric(dim(df)[1])
@@ -740,16 +860,93 @@ nimble.abund <- function(siteformula = NULL, obsformula = NULL, y = NULL, siteva
     df[,i] <- makeFac(df[,i], char.only = TRUE)
   }
 
-
   # Make Site Level Formula #
   LHS.Site <- substitute(N[1:L], list(L = S))
   factors <- names(Filter(is.factor, df))
   factors.size <- lapply(factors, factor.bracket, df)
-  RHS.Site <- make.glm(mf$siteformula, factors.size,  cl, mixture, "log")
+  RHS.Site <- make.glm(mf$siteformula, factors.size,  cl = cl, mixture, "log", level = quote(site))
 
   LHS.Obs <- substitute(y[1:S], list(S=L))
-  RHS.Obs <- make.glm(mf$obsformula, factors.size,  cl, "Binomial", "log", N = quote(N), Site = quote(Site))
+  RHS.Obs <- make.glm(mf$obsformula, factors.size,  cl= cl, "Binomial", "log", N = quote(N), Site = quote(Site), level = quote(obs))
 
+  glm.expand.Site <- nim_glm$process(LHS.Site, RHS.Site)
+  glm.expand.Obs <- nim_glm$process(LHS.Obs, RHS.Obs)
+
+
+  lm.expand.Site <- lmPredictor$process(glm.expand.Site$LHS, glm.expand.Site$RHS)
+  lm.expand.Obs <- lmPredictor$process(glm.expand.Obs$LHS, glm.expand.Obs$RHS)
+
+  #Full BUGS Code Expansion
+  full.expand <- embedLinesInCurlyBrackets(lines = list(glm.expand.Site$prob.mod, lm.expand.Site$code, glm.expand.Obs$prob.mod, lm.expand.Obs$code))
+
+  #Get Data and Model Readyfor nimbleModel and MCMC
+
+  #Make Factor Variables Numeric
+  indx <- sapply(df, is.factor)
+  df[indx] <- lapply(df[indx], function(x) as.numeric(as.factor(x)))
+
+  start.values <- lapply(append(lm.expand.Site$inits, lm.expand.Obs$inits), lmPred2init, initmcmc)
+
+  #Inititalize N, the latent counts
+  N <- apply(y, 1, max);  N[is.na(N)] <- 0 ; N = N + 1
+  start.values <- append(start.values, list(N = N))
+
+  if(mixture == "NB"){
+    start.values <- append(start.values, list(logalpha = 1))
+  }
+
+  if(mixture == "ZIP"){
+    start.values <- append(start.values, list(theta = .5))
+  }
+
+  nimMod.obj <- nimbleModel(code = full.expand, inits = start.values, constants = as.list(df), data = list(y = df$Count))
+  browser()
+  mod.output <- callNim(nimMod.obj, niter = niter, burn = burnin, chains = chains)
+
+  if(is.list(mod.output)){mod.out = do.call(rbind, mod.output)} else{mod.out = mod.output}
+
+  results <- list("Summary" = makeoutput(mod.output, names(lm.expand.Site$inits), names(lm.expand.Obs$inits)))   #Q: Do we want to backtransform parameters from log and logit scale?
+
+
+  if(returncode==TRUE){results[["BUGScode"]] = full.expand}
+  if(returnsamp==TRUE){results[["Samples"]] = mod.out}
+  return(results)
+}
+
+
+## Main Function for Occupancy Models ##
+nimble.occup <- function(siteformula = NULL, obsformula = NULL, y = NULL, sitevars = NULL, obsvars = NULL, mixture = c("Bernoulli"),
+                         priors = c("Normal","t","Uniform"), dropbase = TRUE, niter = 10000, burnin = 1000, initmcmc = 1, chains = 1,
+                         returncode = FALSE, returnsamp = FALSE){
+  cl <- match.call()
+  mf <- match.call(expand.dots = FALSE)
+
+  obsform <- as.formula(mf$obsformula)
+  stateform <- as.formula(mf$siteformula)
+
+  df <- maketidy(y, sitevars, obsvars) #turn 3 data pieces into one tiny data frame
+
+
+  #Length of Long DF
+  L <- as.numeric(dim(df)[1])
+
+  #No. Sites
+  S <- as.numeric(dim(y)[1])
+
+  #Convert Character Variables to Factors
+  for (i in 1:dim(df)[2]){
+    df[,i] <- makeFac(df[,i], char.only = TRUE)
+  }
+
+  # Make Site Level Formula #
+  LHS.Site <- substitute(z[1:L], list(L = S))
+  factors <- names(Filter(is.factor, df))
+  factors.size <- lapply(factors, factor.bracket, df)
+  RHS.Site <- make.glm(mf$siteformula, factors.size,  cl, mixture, "logit", level = quote(site))
+
+  LHS.Obs <- substitute(y[1:S], list(S=L))
+  RHS.Obs <- make.glm(mf$obsformula, factors.size,  cl, mixture, "logit", N = quote(N), Site = quote(Site), level = quote(obs))
+  browser()
 
   glm.expand.Site <- nim_glm$process(LHS.Site, RHS.Site)
   glm.expand.Obs <- nim_glm$process(LHS.Obs, RHS.Obs)
@@ -766,14 +963,26 @@ nimble.abund <- function(siteformula = NULL, obsformula = NULL, y = NULL, siteva
   indx <- sapply(df, is.factor)
   df[indx] <- lapply(df[indx], function(x) as.numeric(as.factor(x)))
 
-  start.values <- append(lm.expand.Site$inits, lm.expand.Obs$inits)
-  nimInitial <- list()
-  for(iTerm in seq_along(start.values)){
-      nimInitial[[iTerm]] <- lmPred2init(start.values[[iTerm]], initmcmc)
-  }
+  start.values <- lapply(append(lm.expand.Site$inits, lm.expand.Obs$inits), lmPred2init, initmcmc)
 
-  nimInitial <- unlist(nimInitial)
-  nimMod.obj <- nimbleModel(code = full.expand, inits = nimInitial, constants = as.list(df), data = as.list(df$Count))
+  #Inititalize N, the latent counts
+  z <- apply(y, 1, max);  z[is.na(z)] <- 0
+  start.values <- append(start.values, list(z = z))
 
+  nimMod.obj <- nimbleModel(code = full.expand, inits = start.values, constants = as.list(df), data = list(y = df$Count))
+  browser()
+  mod.output <- callNim(nimMod.obj, niter = niter, burn = burnin, chains = chains)
+
+  if(is.list(mod.output)){mod.out = do.call(rbind, mod.output)} else{mod.out = mod.output}
+
+  results <- list("Summary" = makeoutput(mod.output, names(lm.expand.Site$inits), names(lm.expand.Obs$inits)))   #Q: Do we want to backtransform parameters from log and logit scale?
+
+
+  if(returncode==TRUE){results[["BUGScode"]] = full.expand}
+  if(returnsamp==TRUE){results[["Samples"]] = mod.out}
+  return(results)
 }
+
+
+
 
