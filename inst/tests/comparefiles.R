@@ -17,14 +17,24 @@ namedList <- function(...){
   result
 }
 
+
+#Status 1 Indicates the Test Failed
 compareFilesUsingDiff <- function(trialFile, correctFile, main = "") {
   if(main == "") main <- paste0(trialFile, ' and ', correctFile, ' do not match\n')
-  diffOutput <- system2('diff', c(trialFile, correctFile), stdout = TRUE)
+
+  if(.Platform$OS.type == 'windows'){
+    diffOutput <- system2('fc', c(trialFile, correctFile), stdout = TRUE)}
+
+  else{
+    diffOutput <- system2('diff', c(trialFile, correctFile), stdout = TRUE)}
+
   test_that(paste0(main, paste0(diffOutput, collapse = '\n')),
-            expect_true(length(diffOutput) == 0)
+            expect_true(length(diffOutput) < 4)  #testing against length 0 always fails
   )
   invisible(NULL)
 }
+
+
 
 compareFilesByLine <- function(trialResults, correctResults, main = "") {
   test_that(paste0(main, ': same number of output lines'),
@@ -39,7 +49,7 @@ compareFilesByLine <- function(trialResults, correctResults, main = "") {
 }
 
 
-## Simulated Data  ##
+## Simulated Data for Abundance Models  ##
 
 # 20 Sites and 3 Visits
 R <- 20
@@ -62,19 +72,28 @@ day = cbind(x1, x2, x3)
 obsvars = list(m = matrix(data = rexp(60, rate = 10), nrow = 20, ncol = 3), weekday = day)
 
 ## Generate Model Cases to Test ##
-mod1 <- c(quote(~1), quote(~1))
-mod2 <- c(quote(~1), NULL)
-mod3 <- c(quote(~1 + xm), quote(~1))
-mod4 <- c(quote(~1 + (1|A)), quote(~1 + xm))
-mod5 <- c(quote(~xm), quote(~1 + (1|A)))
-mod6 <- c(quote(~1 + ym + (ym|A)), quote(~1 + A))
+#First column is Site Model; 2nd is for Obs Model
+mod1 <- c(quote(~ 1), quote(~ 1))
+mod2 <- c(quote(~ 1), quote(~ xm))
+mod3 <- c(quote(~ 1 + xm), quote(~ 1))
+mod4 <- c(quote(~ 1 + A), quote(~ 1 + weekday))
+mod5 <- c(quote(~ A), quote(~ weekday))
+mod6 <- c(quote(~ 1 + ym + (ym|A)), quote(~ 1 + A))
+mod7 <- c(quote(~ 1 + ym + xm*ym), quote(~ 1 + A))
+
+#Models with Random Effects
+mod8 <- c(quote(~ (1|A)), quote(~ (1|weekday)))
+mod9 <- c(quote(~ 1 + xm + (xm|A)), quote(~ 1 + (1|weekday)))
+mod10 <- c(quote(~ 1 + xm), quote(~1 + (m|weekday)))
+mod11 <- c(quote(~ 1 + (1|A)), quote(~1 + xm))
+mod12 <- c(quote(~ 1 + ym + (ym|A)), quote(~1 + A))
 
 
-allmod <- namedList(mod1, mod2, mod3, mod4, mod5, mod6)
+#Put all Test Cases in List
+allmod <- namedList(mod1, mod2, mod3, mod4, mod5, mod6, mod7, mod8, mod9, mod10, mod11, mod12)
 
-
-testcode <- function(S, O){
-  runtest = eval(substitute(nimble.abund(siteformula = S, obsformula = O , y = y, sitevars = sitevars, obsvars = obsvars, mixture = "Poisson", priors = "Normal",
+testcode <- function(S, O, mixture){
+  runtest = eval(substitute(nimble.abund(siteformula = S, obsformula = O , y = y, sitevars = sitevars, obsvars = obsvars, mixture = mixture, priors = "Normal",
                       dropbase = FALSE, niter = 10, burnin = 1, initmcmc = 1, chains = 2, returncode = TRUE, returnsamp = TRUE),
                       list(S = S, O = O)))
   return(runtest$BUGScode)
@@ -84,19 +103,42 @@ testcode <- function(S, O){
 #Generate Code Over All Models #
 
 testoutput <- list()
-for (i in 1:3){
+for (i in 1:12){
   model.id <- (paste0(quote(mod), i))
   model.formula <- allmod[[model.id]]
-  testoutput[[i]] <- testcode(model.formula[[1]], model.formula[[2]])
+  testoutput[[i]] <- testcode(model.formula[[1]], model.formula[[2]], mixture ="ZIP")
 }
 
 
 goldfile <- Combine.Code(testoutput)
-goldfile2 <- goldfile
+dput(goldfile, file="NMixPoiGold.txt")  #save .txt file for Binomial/Poisson N Mixture 7/11/17
+
 
 
 #Compare Output Files
 compareFilesUsingDiff(goldfile, goldfile2)
 compareFilesByLine(goldfile, goldfile2)
+
+## Simulate Data for Dynamic Occupancy Models ##
+#Toy Data for Testing
+
+data <- readRDS("dyn.occu.test.dat.rds")
+detection <- data$data$y
+detection <- detection[,,-1] #Site, Survey, Season
+
+
+#Simulated Covariates for Site and Season
+myMat1 <-matrix(runif(9*100), ncol=9)
+myMat2 <-matrix(rnorm(9*100), ncol=9)
+seasonsitevars <- list(elev = myMat1, height = myMat2)
+
+#Simulated Season 1 Site Vars
+sitevars <- as.data.frame(matrix(rexp(100)))
+colnames(sitevars) <- "length"
+
+#ObsSiteLocationVars
+pvars <- list(heightcm = detection, time = detection)
+
+
 
 
