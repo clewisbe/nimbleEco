@@ -1,0 +1,375 @@
+{
+    {
+        for (i in 1:20) {
+            N[i] ~ dpois(lambda[i])
+        }
+        {
+            for (i in 1:20) {
+                log(lambda[i]) <- s.intercept
+            }
+            {
+                s.intercept ~ dnorm(0, sd = 1000)
+            }
+        }
+        for (i in 1:60) {
+            y[i] ~ dbinom(p[i], N[Site[i]])
+        }
+        {
+            for (i in 1:60) {
+                logit(p[i]) <- o.xm * xm[i]
+            }
+            {
+                o.xm ~ dnorm(0, sd = 1000)
+            }
+        }
+    }
+    {
+        for (i in 1:20) {
+            N[i] ~ dpois(lambda[i])
+        }
+        {
+            for (i in 1:20) {
+                log(lambda[i]) <- s.intercept + s.xm * xm[i]
+            }
+            {
+                s.intercept ~ dnorm(0, sd = 1000)
+                s.xm ~ dnorm(0, sd = 1000)
+            }
+        }
+        for (i in 1:60) {
+            y[i] ~ dbinom(p[i], N[Site[i]])
+        }
+        {
+            for (i in 1:60) {
+                logit(p[i]) <- o.intercept
+            }
+            {
+                o.intercept ~ dnorm(0, sd = 1000)
+            }
+        }
+    }
+    {
+        for (i in 1:20) {
+            N[i] ~ dpois(lambda[i])
+        }
+        {
+            for (i in 1:20) {
+                log(lambda[i]) <- s.intercept + A.effect.s[A[i]]
+            }
+            {
+                s.intercept ~ dnorm(0, sd = 1000)
+                {
+                  A.effect.s[1] <- 0
+                  for (i in 2:3) {
+                    A.effect.s[i] ~ dnorm(0, sd = 1000)
+                  }
+                }
+            }
+        }
+        for (i in 1:60) {
+            y[i] ~ dbinom(p[i], N[Site[i]])
+        }
+        {
+            for (i in 1:60) {
+                logit(p[i]) <- o.intercept + weekday.effect.o[weekday[i]]
+            }
+            {
+                o.intercept ~ dnorm(0, sd = 1000)
+                {
+                  weekday.effect.o[1] <- 0
+                  for (i in 2:3) {
+                    weekday.effect.o[i] ~ dnorm(0, sd = 1000)
+                  }
+                }
+            }
+        }
+    }
+    {
+        for (i in 1:20) {
+            N[i] ~ dpois(lambda[i])
+        }
+        {
+            for (i in 1:20) {
+                log(lambda[i]) <- A.effect.s[A[i]]
+            }
+            {
+                {
+                  for (i in 1:3) {
+                    A.effect.s[i] ~ dnorm(0, sd = 1000)
+                  }
+                }
+            }
+        }
+        for (i in 1:60) {
+            y[i] ~ dbinom(p[i], N[Site[i]])
+        }
+        {
+            for (i in 1:60) {
+                logit(p[i]) <- weekday.effect.o[weekday[i]]
+            }
+            {
+                {
+                  for (i in 1:3) {
+                    weekday.effect.o[i] ~ dnorm(0, sd = 1000)
+                  }
+                }
+            }
+        }
+    }
+    {
+        for (i in 1:20) {
+            N[i] ~ dpois(lambda[i])
+        }
+        {
+            for (i in 1:20) {
+                log(lambda[i]) <- s.intercept + s.ym * ym[i] + 
+                  ymA.effect.s[A[i]] * ym[i]
+            }
+            {
+                s.intercept ~ dnorm(0, sd = 1000)
+                s.ym ~ dnorm(0, sd = 1000)
+                {
+                  for (i in 1:3) {
+                    ymA.effect.s[i] ~ dnorm(ymA.effect.s.mu, 
+                      sd = ymA.effect.s.sigma)
+                  }
+                  ymA.effect.s.sigma ~ dunif(0, 1000)
+                  ymA.effect.s.mu <- 0
+                }
+            }
+        }
+        for (i in 1:60) {
+            y[i] ~ dbinom(p[i], N[Site[i]])
+        }
+        {
+            for (i in 1:60) {
+                logit(p[i]) <- o.intercept + A.effect.o[A[i]]
+            }
+            {
+                o.intercept ~ dnorm(0, sd = 1000)
+                {
+                  A.effect.o[1] <- 0
+                  for (i in 2:3) {
+                    A.effect.o[i] ~ dnorm(0, sd = 1000)
+                  }
+                }
+            }
+        }
+    }
+    {
+        for (i in 1:20) {
+            N[i] ~ dpois(lambda[i])
+        }
+        {
+            for (i in 1:20) {
+                log(lambda[i]) <- s.intercept + s.ym * ym[i] + 
+                  s.xmym * xm[i] * ym[i]
+            }
+            {
+                s.intercept ~ dnorm(0, sd = 1000)
+                s.ym ~ dnorm(0, sd = 1000)
+                s.xmym ~ dnorm(0, sd = 1000)
+            }
+        }
+        for (i in 1:60) {
+            y[i] ~ dbinom(p[i], N[Site[i]])
+        }
+        {
+            for (i in 1:60) {
+                logit(p[i]) <- o.intercept + A.effect.o[A[i]]
+            }
+            {
+                o.intercept ~ dnorm(0, sd = 1000)
+                {
+                  A.effect.o[1] <- 0
+                  for (i in 2:3) {
+                    A.effect.o[i] ~ dnorm(0, sd = 1000)
+                  }
+                }
+            }
+        }
+    }
+    {
+        for (i in 1:20) {
+            N[i] ~ dpois(lambda[i])
+        }
+        {
+            for (i in 1:20) {
+                log(lambda[i]) <- s.A[A[i]]
+            }
+            {
+                {
+                  for (i in 1:3) {
+                    s.A[i] ~ dnorm(s.A.mu, sd = s.A.sigma)
+                  }
+                  s.A.sigma ~ dunif(0, 1000)
+                  s.A.mu ~ dnorm(0, sd = 1000)
+                }
+            }
+        }
+        for (i in 1:60) {
+            y[i] ~ dbinom(p[i], N[Site[i]])
+        }
+        {
+            for (i in 1:60) {
+                logit(p[i]) <- o.weekday[weekday[i]]
+            }
+            {
+                {
+                  for (i in 1:3) {
+                    o.weekday[i] ~ dnorm(o.weekday.mu, sd = o.weekday.sigma)
+                  }
+                  o.weekday.sigma ~ dunif(0, 1000)
+                  o.weekday.mu ~ dnorm(0, sd = 1000)
+                }
+            }
+        }
+    }
+    {
+        for (i in 1:20) {
+            N[i] ~ dpois(lambda[i])
+        }
+        {
+            for (i in 1:20) {
+                log(lambda[i]) <- s.intercept + s.xm * xm[i] + 
+                  xmA.effect.s[A[i]] * xm[i]
+            }
+            {
+                s.intercept ~ dnorm(0, sd = 1000)
+                s.xm ~ dnorm(0, sd = 1000)
+                {
+                  for (i in 1:3) {
+                    xmA.effect.s[i] ~ dnorm(xmA.effect.s.mu, 
+                      sd = xmA.effect.s.sigma)
+                  }
+                  xmA.effect.s.sigma ~ dunif(0, 1000)
+                  xmA.effect.s.mu <- 0
+                }
+            }
+        }
+        for (i in 1:60) {
+            y[i] ~ dbinom(p[i], N[Site[i]])
+        }
+        {
+            for (i in 1:60) {
+                logit(p[i]) <- o.intercept + o.weekday[weekday[i]]
+            }
+            {
+                o.intercept ~ dnorm(0, sd = 1000)
+                {
+                  for (i in 1:3) {
+                    o.weekday[i] ~ dnorm(o.weekday.mu, sd = o.weekday.sigma)
+                  }
+                  o.weekday.sigma ~ dunif(0, 1000)
+                  o.weekday.mu <- 0
+                }
+            }
+        }
+    }
+    {
+        for (i in 1:20) {
+            N[i] ~ dpois(lambda[i])
+        }
+        {
+            for (i in 1:20) {
+                log(lambda[i]) <- s.intercept + s.xm * xm[i]
+            }
+            {
+                s.intercept ~ dnorm(0, sd = 1000)
+                s.xm ~ dnorm(0, sd = 1000)
+            }
+        }
+        for (i in 1:60) {
+            y[i] ~ dbinom(p[i], N[Site[i]])
+        }
+        {
+            for (i in 1:60) {
+                logit(p[i]) <- o.intercept + mweekday.effect.o[weekday[i]] * 
+                  m[i]
+            }
+            {
+                o.intercept ~ dnorm(0, sd = 1000)
+                {
+                  for (i in 1:3) {
+                    mweekday.effect.o[i] ~ dnorm(mweekday.effect.o.mu, 
+                      sd = mweekday.effect.o.sigma)
+                  }
+                  mweekday.effect.o.sigma ~ dunif(0, 1000)
+                  mweekday.effect.o.mu <- 0
+                }
+            }
+        }
+    }
+    {
+        for (i in 1:20) {
+            N[i] ~ dpois(lambda[i])
+        }
+        {
+            for (i in 1:20) {
+                log(lambda[i]) <- s.intercept + s.A[A[i]]
+            }
+            {
+                s.intercept ~ dnorm(0, sd = 1000)
+                {
+                  for (i in 1:3) {
+                    s.A[i] ~ dnorm(s.A.mu, sd = s.A.sigma)
+                  }
+                  s.A.sigma ~ dunif(0, 1000)
+                  s.A.mu <- 0
+                }
+            }
+        }
+        for (i in 1:60) {
+            y[i] ~ dbinom(p[i], N[Site[i]])
+        }
+        {
+            for (i in 1:60) {
+                logit(p[i]) <- o.intercept + o.xm * xm[i]
+            }
+            {
+                o.intercept ~ dnorm(0, sd = 1000)
+                o.xm ~ dnorm(0, sd = 1000)
+            }
+        }
+    }
+    {
+        for (i in 1:20) {
+            N[i] ~ dpois(lambda[i])
+        }
+        {
+            for (i in 1:20) {
+                log(lambda[i]) <- s.intercept + s.ym * ym[i] + 
+                  ymA.effect.s[A[i]] * ym[i]
+            }
+            {
+                s.intercept ~ dnorm(0, sd = 1000)
+                s.ym ~ dnorm(0, sd = 1000)
+                {
+                  for (i in 1:3) {
+                    ymA.effect.s[i] ~ dnorm(ymA.effect.s.mu, 
+                      sd = ymA.effect.s.sigma)
+                  }
+                  ymA.effect.s.sigma ~ dunif(0, 1000)
+                  ymA.effect.s.mu <- 0
+                }
+            }
+        }
+        for (i in 1:60) {
+            y[i] ~ dbinom(p[i], N[Site[i]])
+        }
+        {
+            for (i in 1:60) {
+                logit(p[i]) <- o.intercept + A.effect.o[A[i]]
+            }
+            {
+                o.intercept ~ dnorm(0, sd = 1000)
+                {
+                  A.effect.o[1] <- 0
+                  for (i in 2:3) {
+                    A.effect.o[i] ~ dnorm(0, sd = 1000)
+                  }
+                }
+            }
+        }
+    }
+}

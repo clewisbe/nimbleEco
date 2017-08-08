@@ -52,24 +52,23 @@ compareFilesByLine <- function(trialResults, correctResults, main = "") {
 ## Simulated Data for Abundance Models  ##
 
 # 20 Sites and 3 Visits
-R <- 20
-T <- 3
-y <- array(dim=c(R,T))
-N <- rpois(n=R, lambda =2)
-for (j in 1:T){
-  y[,j] <- rbinom(n=R, size=N, prob = .5)
+S <- 20
+V <- 3
+y <- array(dim = c(S, V))
+N <- rpois(n = S, lambda =2)
+for (j in 1:V){
+  y[,j] <- rbinom(n = S, size = N, prob = .5)
 }
 
 y <- as.data.frame(y)
 
-sitevars = list(z = rpois(20,2), xm = rnorm(20), ym = rgamma(20,3), A = c(rep('Red', 7), rep('Orange',3), rep('Blue', 10)))
-sitevars = as.data.frame(sitevars)
+sitevars = as.data.frame(list(z = rpois(20,2), xm = rnorm(20), ym = rgamma(20,3), A = c(rep('Red', 7), rep('Orange',3), rep('Blue', 10))))
 x1 = rep('Mon', 20)
 x2 = rep('Tues', 20)
 x3 = rep('Wed', 20)
 day = cbind(x1, x2, x3)
 
-obsvars = list(m = matrix(data = rexp(60, rate = 10), nrow = 20, ncol = 3), weekday = day)
+obsvars = list(growth = matrix(data = rexp(60, rate = 10), nrow = 20, ncol = 3), weekday = day)
 
 ## Generate Model Cases to Test ##
 #First column is Site Model; 2nd is for Obs Model
@@ -122,9 +121,9 @@ compareFilesByLine(goldfile, goldfile2)
 ## Simulate Data for Dynamic Occupancy Models ##
 #Toy Data for Testing
 
-data <- readRDS("dyn.occu.test.dat.rds")
-detection <- data$data$y
-detection <- detection[,,-1] #Site, Survey, Season
+#data <- readRDS("dyn.occu.test.dat.rds")
+#detection <- data$data$y
+#detection <- detection[,,-1] #Site, Survey, Season
 
 
 #Simulated Covariates for Site and Season
