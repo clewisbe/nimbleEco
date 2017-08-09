@@ -861,7 +861,7 @@ callNim <- function(modobj, initial, niter, burn, chains) {
   nimMod.C <- compileNimble(modobj)
 
   # Set Up MCMC
-  config.Mod <- configureMCMC(nimMod.C, print = TRUE)
+  config.Mod <- configureMCMC(nimMod.C, print = FALSE)
   mod.MCMC <- buildMCMC(config.Mod)
   C.mod.MCMC <- compileNimble(mod.MCMC)
   samplesList <- runMCMC(C.mod.MCMC, inits = initial, niter = niter, nburnin = burn, nchains = chains, returnCodaMCMC = TRUE)
