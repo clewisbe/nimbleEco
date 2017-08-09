@@ -1,10 +1,10 @@
 ### NIMBLE Dynamic Occupancy Models ###
 
-library(nimble)
+#library(nimble)
 # library(devtools) install_github('nimble-dev/nimble', ref = 'devel', subdir = 'packages/nimble')
-library(tidyverse)
-library(reshape2)
-library(coda)
+#library(tidyr)
+#library(reshape2)
+#library(coda)
 nimbleOptions(enableBUGSmodules = TRUE)
 
 makeBUGSmodule <- function(fun) {

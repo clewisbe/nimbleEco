@@ -70,6 +70,9 @@ day = cbind(x1, x2, x3)
 
 obsvars = list(growth = matrix(data = rexp(60, rate = 10), nrow = 20, ncol = 3), weekday = day)
 
+abundance.sim <- list(y = y , sitevars = sitevars, obsvars =  obsvars)
+saveRDS(abundance.sim, "abundance.sim.rds")
+
 ## Generate Model Cases to Test ##
 #First column is Site Model; 2nd is for Obs Model
 mod1 <- c(quote(~ 1), quote(~ 1))

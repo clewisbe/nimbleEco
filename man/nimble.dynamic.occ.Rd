@@ -107,7 +107,7 @@ for (i in 1:R){
 
 
 #Fit Model
-model <- nimble.dynamic.occ(psiformula = ~ 1, phiformula = ~1, gammaformula = ~1, pformula = ~ 1, y = y, initmcmc = 1, chains = 1)
+model <- nimble.dynamic.occ(psiformula = ~ 1, phiformula = ~ Season, gammaformula = ~ Season, pformula = ~ Season, y = y, initmcmc = 1, chains = 1, dropbase = FALSE)
 
 
 }

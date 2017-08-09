@@ -1,5 +1,5 @@
 require(testthat)
-require(methods)
+library(nimble)
 require(nimbleEcology)
 
 #Make an automatic named list
@@ -32,10 +32,9 @@ mod12 <- list(site = quote(~ 1 + ym + (ym|A)), obs = quote(~ 1 + A))
 all.abund.mod <- namedList(mod1, mod2, mod3, mod4, mod5, mod6, mod7, mod8, mod9, mod10, mod11, mod12)
 
 
-
 test_mcmc <- function(model, data, inits = 1, iter = 10, burnin = 5 , mixture = "Poisson", seed = 1, gold = NULL, compare = TRUE){
   if (data == "abundance"){
-  dat <- readRDS("./inst/testdata/abundance.sim.rds")
+  dat <- readRDS(system.file("testdata", 'abundance.sim.rds',package="nimbleEcology"))
   }
   set.seed(seed)
   runtest = eval(substitute(nimble.abund(siteformula = S, obsformula = O , y = dat$y, sitevars = dat$sitevars, obsvars = dat$obsvars,,mixture = mixture, priors = "Normal",

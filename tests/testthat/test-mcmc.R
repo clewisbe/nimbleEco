@@ -19,10 +19,8 @@ sink(tempFileName)
 nimbleProgressBarSetting <- nimbleOptions('MCMCprogressBar')
 nimbleOptions(MCMCprogressBar = FALSE)
 
-
 ## Tests Abundance Models
-abund.gold <- readRDS("./inst/testdata/abundance.gold.rds")
-
+abund.gold <- readRDS(system.file("testdata", 'abundance.gold.rds',package="nimbleEcology"))
 
 test_that("mcmc compare abund",{
           for (i in 1:1){
@@ -31,7 +29,6 @@ test_that("mcmc compare abund",{
         })
 
 sink(NULL)
-
 
 options(warn = RwarnLevel)
 nimbleOptions(verbose = nimbleVerboseSetting)
