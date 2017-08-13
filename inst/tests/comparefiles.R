@@ -51,18 +51,27 @@ compareFilesByLine <- function(trialResults, correctResults, main = "") {
 
 ## Simulated Data for Abundance Models  ##
 
+#Generate Dependent Varialbe for Abundance or Occupancy Models
 # 20 Sites and 3 Visits
-S <- 20
-V <- 3
-y <- array(dim = c(S, V))
-N <- rpois(n = S, lambda =2)
-for (j in 1:V){
-  y[,j] <- rbinom(n = S, size = N, prob = .5)
+sim.y <- function(S = 20, V = 3, prob = .5, lam = 2, model){
+  y <- array(dim = c(S, V))
+  if (model == "abundance"){
+  N <- rpois(n = S, lambda = lam)
+  }
+  else{
+    N <- 1
+  }
+  for (j in 1:V){
+    y[,j] <- rbinom(n = S, size = N, prob = .5)
+  }
+  return(as.data.frame(y))
 }
 
-y <- as.data.frame(y)
 
-sitevars = as.data.frame(list(z = rpois(20,2), xm = rnorm(20), ym = rgamma(20,3), A = c(rep('Red', 7), rep('Orange',3), rep('Blue', 10))))
+y.a <- sim.y(model = "abundance")
+y.o <- sim.y(model = "occupancy")
+
+sitevars = as.data.frame(list(zm = rpois(20,2), xm = rnorm(20), ym = rgamma(20,3), A = c(rep('Red', 7), rep('Orange',3), rep('Blue', 10))))
 x1 = rep('Mon', 20)
 x2 = rep('Tues', 20)
 x3 = rep('Wed', 20)
@@ -70,8 +79,10 @@ day = cbind(x1, x2, x3)
 
 obsvars = list(growth = matrix(data = rexp(60, rate = 10), nrow = 20, ncol = 3), weekday = day)
 
-abundance.sim <- list(y = y , sitevars = sitevars, obsvars =  obsvars)
+abundance.sim <- list(y = y.a , sitevars = sitevars, obsvars =  obsvars)
+occupancy.sim <- list(y = y.o, sitevars = sitevars, obsvars = obsvars)
 saveRDS(abundance.sim, "abundance.sim.rds")
+saveRDS(occupancy.sim, "occupancy.sim.rds")
 
 ## Generate Model Cases to Test ##
 #First column is Site Model; 2nd is for Obs Model

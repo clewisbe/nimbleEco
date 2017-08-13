@@ -2,7 +2,7 @@
 % Please edit documentation in R/nim_abundance.R
 \name{nimble.abund}
 \alias{nimble.abund}
-\title{Estimation of Abundance from Counts Using the Binomial Mixture Model.}
+\title{Estimation of Abundance from Counts Using Binomial Mixture Models.}
 \usage{
 nimble.abund(siteformula = NULL, obsformula = NULL, y = NULL,
   sitevars = NULL, obsvars = NULL, mixture = c("Poisson", "ZIP", "NB"),
@@ -11,68 +11,99 @@ nimble.abund(siteformula = NULL, obsformula = NULL, y = NULL,
   5, 10), chains = 4, returncode = TRUE, returnsamp = TRUE, ...)
 }
 \arguments{
-\item{siteformula}{A linear model formula for the latent state: \eqn{log(\lambda_{i})}.  Formula must start with a tilde (~).  Add 1 for an intercept.
-Random effects are specified with a pipe (e.g., (1|A)).  Interactions can be specified with * (e.g., x*y).}
+\item{siteformula}{A linear model formula for the latent state:
+\eqn{log(\lambda_{i})}.  Formula must start with a tilde (~).  Add -1 to
+remove intercept. Random effects are specified with a pipe (see
+\link[lme4]{glmer}).  If model contains an intercept random effects will be
+centered at 0.  Interactions can be specified with * (e.g., x*y).}
 
-\item{obsformula}{A linear model formula for the observation process: \eqn{logit(p_{i,j})}.}
+\item{obsformula}{A linear model formula for the observation process:
+\eqn{logit(p_{i,j})}.}
 
-\item{y}{The observed counts at site i during temporal replicate j.  Must be provided as either a matrix or dataframe. Rows are sites and columns are replicates.}
+\item{y}{The observed counts at site i during temporal replicate j.  Must be
+provided as either a matrix or dataframe. Rows are sites and columns are
+replicates.}
 
-\item{sitevars}{A dataframe of site-specific covariates.  Must be a dataframe with named columns corresponding to variables.  Number of rows should equal the number of sites.}
+\item{sitevars}{A dataframe of site-specific covariates.  Must be a dataframe
+with named columns corresponding to variables.  Number of rows should equal
+the number of sites.}
 
-\item{obsvars}{A named list with site and survey specific covariates.  Each list element is a matrix with rows corresponding to site and columns to replicate.
-Variables specific in model must match the names in the list.}
+\item{obsvars}{A named list with site and survey specific covariates.  Each
+list element is a matrix with rows corresponding to site and columns to
+replicate. Variables specified in the model must match the variable names in
+the list.}
 
-\item{mixture}{There are three mixture options for the latent states: Poisson (default), Zero-Inflated Poisson (ZIP), and Negative Binomial (NB).  The ZIP mixture addeds another hierarchial layer to the model.
-The extra layer is a Bernoulli random variable that divides sites between positive counts and sites with 0 counts.  The NB link adds an extra term
-(rho) to model overdispersion.}
+\item{mixture}{There are three mixture options for the latent states: Poisson
+(default), Zero-Inflated Poisson (ZIP), and Negative Binomial (NB).  The ZIP
+mixture adds an extra hierarchial layer to the model, which is a Bernoulli
+random variable that divides sites between positive counts and sites with 0
+counts.  The NB link adds an extra term (rho) to model overdispersion.}
 
-\item{priors}{Prior options for all model parameters.  One prior is assigned to all model parameters specified in the siteformula and obsformula.  The default is a Normal(mu = 0, sd = 1000).  Other options are
-t(mu = 0, tau = 1000, df = 5), Uniform(0, 1000), and Gamma(shape = .001, rate = .001).}
+\item{priors}{One prior is specified for all model parameters in the
+siteformula and obsformula model statements.  The default prior is a
+Normal(mu = 0, sd = 1000).  Other options are t(mu = 0, tau = 1000, df = 5),
+Uniform(0, 1000), and Gamma(shape = .001, rate = .001).}
 
-\item{dropbase}{Drops the first level of a categorical variable.  Default is TRUE.}
+\item{dropbase}{Drops the first level of a factor variable.  Default is TRUE.}
 
-\item{droplast}{Drops the last level of a categorical variable.  Default is FALSE.}
+\item{droplast}{Drops the last level of a factor variable.  Default is FALSE.}
 
-\item{niter}{Number of iterations to run the MCMC.  Default is 10,000 iterations.}
+\item{niter}{Number of iterations to run the MCMC.  Default is 10,000
+iterations.}
 
-\item{burnin}{Number of burnin iterations for MCMC.  Default is 1000 iterations.}
+\item{burnin}{Number of burnin iterations for MCMC.  Default is 1000
+iterations.}
 
-\item{initmcmc}{Vector of initial values for MCMC.  Length of vector should equal the number of chains.  Default is c(1, 5, 10, 15)}
+\item{initmcmc}{Vector of initial values for MCMC.  Length of vector must
+equal the number of chains.  The same initial values are used for all
+parameters. Default is c(1, 5, 10, 15)}
 
 \item{chains}{Number of MCMC chains to run.  Default is 4.}
 
-\item{returncode}{Option to return the BUGS code passed to NIMBLE.  Default is TRUE.}
+\item{returncode}{Option to return the BUGS code passed to NIMBLE.  Default is
+TRUE.}
 
 \item{returnsamp}{Option to return all posterior draws.  Default is TRUE}
 
-\item{...}{User can specify different parameters for the priors.  Options are location, scale, lb, ub, df, shape, rate.}
+\item{...}{Additional arguments can be passed to specify different parameters
+for the priors.  Options are location, scale, lb, ub, df, shape, and rate.}
 }
 \value{
-The output will be a named list with the following elements: Summary, BUGScode, and Samples.  In the Summary statement, variables from the siteformula will start with "s."
-and variables in the obsformula will start with "o."  Also, note parameters are on the transformed scale (log for siteformula variables; logit for obsformula variables).
-In addition to quantiles, the effective sample size and Gelman Rubin diagnoistic are provided from the coda package. \cr \cr
-If the ZIP mixture is selected theta is returned corresponding to the Bernoulli random variable modeling if a site is suitable for a positive abundance count \cr \cr
-If the NB mixture is selected  logalpha is returned, which is the log of the dispersion parameter, alpha, in the negative binomial distribution.
+Output is a named list with the following elements: Summary,
+ BUGScode, and Samples.  In the Summary statement, variables from the
+ siteformula will start with "s.", and variables in the obsformula will start
+ with "o."  Note: parameters are on the transformed scale (log for
+ siteformula variables; logit for obsformula variables). In addition to
+ quantiles, the effective sample size and Gelman Rubin diagnoistic are
+ provided from the \link[coda]{coda} package. \cr \cr If the ZIP mixture is
+ selected theta is returned corresponding to the Bernoulli random variable
+ modeling if a site is suitable for a positive abundance count. \cr \cr If
+ the NB mixture is selected  logalpha is returned, which is the log of the
+ dispersion parameter, alpha, in the NB distribution.
 }
 \description{
-\code{nimble.abund} returns generated BUGS code, model summary statistics, and posterior draws
+\code{nimble.abund} is used to fit Binomial Mixture Models using Bayesian
+estimation.  The function returns model summary statistics, posterior draws,
+and the BUGS code used to estimate the model.
 }
 \details{
-This is a function for fitting Binomial Mixture Models using a Bayeisan framework.  A basic structure of the type of model is:
-\deqn{N_{i} ~ Poisson(\lambda_{i})}
-\deqn{y_{i,j} | N_{i} ~ Binomial(N_{i}, p_{i,j})}
-Where i is the number of sites and j the number of temporal replicates.  N is a latent variable for population size.
-  Both \eqn{\lambda} and p can be modeled as a linear function of covariates via a linked GLM.  The link for \eqn{\lambda} is the log link.  The link for p
-  is the logit link.  Estimation is performed using NIMBLE.  In addition to fitting the model, generated BUGS code for the full model,
-  as well as posterior draws are available.
+This is a function for fitting Binomial Mixture Models using a Bayesian
+framework.  The model structure is: \deqn{N_{i} ~ Poisson(\lambda_{i})}
+\deqn{y_{i,j} | N_{i} ~ Binomial(N_{i}, p_{i,j})} Where i is the number of
+sites and j the number of temporal replicates.  N is a latent variable for
+population size. Both \eqn{\lambda} and p can be modeled as a linear function
+of covariates via a linked GLM.  The link for \eqn{\lambda} is the log link.
+The link for p is the logit link.  Estimation is performed using NIMBLE.  In
+addition to fitting the model, generated BUGS code for the full model, as well
+as posterior draws, are returned.
 }
 \examples{
-# Simualte Data from Kery and Schaub (p. 391): \\url{http://www.sciencedirect.com/science/book/9780123870209}
-R <- 200
+# Simulate Abundance Data
+R <- 75
 T <- 3
 X <- runif(n = R, min = -1, max = 1)
-sim.covariates <- as.data.frame(X)
+A = c(rep('Red', 25), rep('Orange',20), rep('Blue', 30))
+sim.covariates <- data.frame("X" = X, "A" = A)
 lam <- exp(1 + 3*X)
 N <- rpois(n = R, lambda = lam)
 p <- plogis(-5*X)
@@ -80,9 +111,8 @@ y <- matrix(NA, nrow = R, ncol = T)
 for (i in 1:T){y[,i] <- rbinom(n = R, size = N, prob =p)}
 
 
-
 #Fit Model
-model <- nimble.abund(siteformula = ~ 1 + X, obsformula = ~ 1 + X, y = y, sitevars = sim.covariates, initmcmc = 1, chains = 1)
+model <- nimble.abund(siteformula = ~ 1 + (1|A) + X, obsformula = ~ X, y = y, sitevars = sim.covariates, initmcmc = 1, chains = 1)
 
 
 }

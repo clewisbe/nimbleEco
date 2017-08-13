@@ -1,56 +1,89 @@
-#' Estimation of Dynamic (MultiSeason) Single-Species Occupancy Models
+#'Estimation of Dynamic (MultiSeason) Single-Species Occupancy Models
 #'
-#' \code{nimble.occ} returns generated BUGS code, model summary statistics, and posterior draws
+#'\code{nimble.dynamic.occ} is used to fit single species multi-season occupancy
+#'models using Bayesian estimation.  The function returns model summary
+#'statistics, posterior draws, and the BUGS code used to estimate the model.
 #'
-#' This is a function for fitting Multiseason Single Species Site Occupancy Models using a Bayeisan framework.  A basic structure of the type of model is:
-#' \deqn{z_{1} ~ Bernoulli(\psi_{1})}
-#' \deqn{z_{i,k} ~ Bernoulli(\psi_{i,k})}
-#' \deqn{z_{k+1}|z_{k} ~ Bernoulli(z_{k} * \phi_{i,k} + (1-z{k}) * \gamma_{i,k})}
-#' \deqn{y_{i,j,k} | z_{i,k} ~ Bernoulli(z_{i,k} * p_{i,j,k})}
+#'This is a function for fitting Multiseason Single Species Site Occupancy
+#'Models using a Bayeisan framework.  The model structure is: \deqn{z_{1} ~
+#'Bernoulli(\psi_{1})} \deqn{z_{i,k} ~ Bernoulli(\psi_{i,k})}
+#'\deqn{z_{k+1}|z_{k} ~ Bernoulli(z_{k} * \phi_{i,k} + (1-z{k}) * \gamma_{i,k})}
+#'\deqn{y_{i,j,k} | z_{i,k} ~ Bernoulli(z_{i,k} * p_{i,j,k})}
 #'
-#' Where i indexing site, j indexes survey, and k indexes the season. z is a binary latent variable for the true observed state (occupied or not occupied).
-#' The parameter \eqn{\psi_1{}} (first year occupancy) can be modeled as a linear function of site covariates; \eqn{\phi_{i,k}} (probability of local survial), and \eqn{\gamma_{i,k}}
-#' (colonization probabiliy) can all be modeled as linear functions of site and site.season covariates; and \eqn{p_{i,j,k}} (detection probability) can be modeled as a linear function of
-#' site, site.season, or site.season.survey covariates.  For all 3 models a logit link is used.    \cr \cr
-#'  Estimation is performed using NIMBLE.  In addition to fitting the model, generated BUGS code for the full model,
-#'   as well as posterior draws are available.
-#'
-#'
-#' @param psiformula  A linear model formula for first year occupancy: \eqn{logit(\psi_{1})}.  Formula must start with a tilde (~).  Add 1 for an intercept.
-#' Random effects are specified with a pipe (e.g., (1|A)).  Interactions can be specified with * (e.g., x*y).
-#' @param phiformula A linear model formula for survival probability: \eqn{logit(\phi_{i,k})}
-#' @param gammaformula A linear model formula for the probability of colonization: \eqn{logit(\gamma_{i,k})}.
-#' @param pformula A linear model formula for the probability of detection: \eqn{logit(\p_{i,j,k})}.
-#' @param y Input as a 3 dimensinoal array (site, survey, season) with binary values: 1 for detection, 0 otherwise.
-#' @param site A data frame or matrix.  Rows are sites and columns (with labels) are independent variables
-#' @param site.season A named list (rows site, columns season) with each list element corresponding to an independent variable
-#' @param site.season.survey  A named list of arrays (site, survey, season) with each name corresponding to an independent variable
-#' @param priors Prior options for all model parameters.  One prior is assigned to all model parameters specified in the siteformula and obsformula.  The default is a Normal(mu = 0, sd = 1).  Other options are
-#' t(mu = 0, tau = 1000, df = 5), Uniform(0, 1000), and Gamma(shape = .001, rate = .001).
-#' @param dropbase Drops the first level of a categorical variable.  Default is TRUE.
-#' @param droplast Drops the last level of a categorical variable.  Default is TRUE.
-#' @param niter Number of iterations to run the MCMC.  Default is 10,000 iterations.
-#' @param burnin Number of burnin iterations for MCMC.  Default is 1000 iterations.
-#' @param initmcmc Vector of initial values for MCMC.  Length of vector should equal the number of chains.  Default is c(1, 5, 10, 15)
-#' @param chains Number of MCMC chains to run.  Default is 4.
-#' @param returncode Option to return the BUGS code passed to NIMBLE.  Default is TRUE.
-#' @param returnsamp Option to return all posterior draws.  Default is TRUE
-#' @param ... User can specify different parameters for the priors.  Options are location, scale, lb, ub, df, shape, rate.
+#'Where i indexing site, j indexes survey, and k indexes the season. z is a
+#'binary latent variable for the true observed state (occupied or not occupied).
+#'The parameter \eqn{\psi_1{}} (first year occupancy) can be modeled as a linear
+#'function of site covariates; \eqn{\phi_{i,k}} (probability of local survial),
+#'and \eqn{\gamma_{i,k}} (colonization probabiliy) can be modeled as linear
+#'functions of site and site.season covariates; and \eqn{p_{i,j,k}} (detection
+#'probability) can be modeled as a linear function of site, site.season, or
+#'site.season.survey covariates.  A logit link is used for all 3 models.    \cr
+#'\cr Estimation is performed using NIMBLE.  In addition to fitting the model,
+#'generated BUGS code for the full model, as well as posterior draws, are
+#'returned.
 #'
 #'
+#'@param psiformula  A linear model formula for first year occupancy:
+#'  \eqn{logit(\psi_{1})}.  Formula must start with a tilde (~).  Add -1 to
+#'  remove intercept. Random effects are specified with a pipe (see
+#'  \link[lme4]{glmer}).  If model contains an intercept random effects will be
+#'  centered at 0.  Interactions can be specified with * (e.g., x*y).
+#'@param phiformula A linear model formula for survival probability:
+#'  \eqn{logit(\phi_{i,k})}
+#'@param gammaformula A linear model formula for the probability of
+#'  colonization: \eqn{logit(\gamma_{i,k})}.
+#'@param pformula A linear model formula for the probability of detection:
+#'  \eqn{logit(\p_{i,j,k})}.
+#'@param y A 3 dimensinoal array (site, survey, season) with binary values: 1
+#'  for detection, 0 otherwise.
+#'@param site A data frame or matrix.  Rows are sites and columns (with variable
+#'  names) are independent variables.
+#'@param site.season A named list (rows site, columns season) with each list
+#'  element corresponding to an independent variable. Variables specified in the
+#'  model must match the variable names in the list.
+#'@param site.season.survey  A named list of arrays (site, survey, season) with
+#'  each name corresponding to an independent variable. Variables specified in
+#'  the model must match the variable names in the list.
+#'@param priors One prior is specified for all model parameters in the
+#'  siteformula and obsformula model statements.  The default prior is a
+#'  Normal(mu = 0, sd = 1).  Other options are t(mu = 0, tau = 1000, df = 5),
+#'  Uniform(0, 1000), and Gamma(shape = .001, rate = .001).
+#'@param dropbase  Drops the first level of a factor variable.  Default is TRUE.
+#'@param droplast Drops the last level of a factor variable.  Default is TRUE.
+#'@param niter Number of iterations to run the MCMC.  Default is 10,000
+#'  iterations.
+#'@param burnin Number of burnin iterations for MCMC.  Default is 1000
+#'  iterations.
+#'@param initmcmc Vector of initial values for MCMC.  Length of vector must
+#'  equal the number of chains.  The same initial values are used for all
+#'  parameters. Default is c(1, 5, 10, 15)
+#'@param chains Number of MCMC chains to run.  Default is 4.
+#'@param returncode Option to return the BUGS code passed to NIMBLE.  Default is
+#'  TRUE.
+#'@param returnsamp Option to return all posterior draws.  Default is TRUE
+#'@param ... Additional arguments can be passed to specify different parameters
+#'  for the priors.  Options are location, scale, lb, ub, df, shape, and rate.
 #'
-#' @return The output will be a named list with the following elements: Summary, BUGScode, and Samples.  In the Summary statement, variables from the psiformula will start with "s.",
-#' variables in the phiformula will start with "phi.", variables from the gammaformula will start with "gam.", and variables from the pformula will start with "p.".  Also, note parameters are on the transformed scale (logit).
-#' In addition to quantiles, the effective sample size and Gelman Rubin diagnoistic are provided from the coda package.
+#'
+#'
+#'
+#'@return Output is a named list with the following elements: Summary, BUGScode,
+#'  and Samples.  In the Summary statement, variables from the psiformula will
+#'  start with "s.", variables in the phiformula will start with "phi.",
+#'  variables from the gammaformula will start with "gam.", and variables from
+#'  the pformula will start with "p.".  Also, note parameters are on the
+#'  transformed scale (logit). In addition to quantiles, the effective sample
+#'  size and Gelman Rubin diagnoistic are provided from the \link[coda]{coda}
+#'  package.
 #'
 #'
 #'
 #'
-#' @author Colin Lewis-Beck
+#'@author Colin Lewis-Beck
 #'
 #' @examples
 #' # Simualte Data from Kery and Schaub (p. 440): \url{http://www.sciencedirect.com/science/book/9780123870209}
-#' R <- 250 #Number of Sites
+#' R <- 100 #Number of Sites
 #' J <- 3 #Number of Surveys
 #' K <- 10 #Number of Seasons
 #' psi1 <- 0.4 #First year occupancy probability
@@ -83,7 +116,7 @@
 #'
 #'
 #' #Fit Model
-#' model <- nimble.dynamic.occ(psiformula = ~ 1, phiformula = ~ Season, gammaformula = ~ Season, pformula = ~ Season, y = y, initmcmc = 1, chains = 1, dropbase = FALSE)
+#' model <- nimble.dynamic.occ(psiformula = ~ 1, phiformula = ~ -1 + Season, gammaformula = ~ -1 + Season, pformula = ~ -1 + Season, y = y, initmcmc = 1, chains = 1, dropbase = FALSE)
 #'
 #'
 #'@export
@@ -118,7 +151,7 @@ nimble.dynamic.occ <- function(psiformula = NULL, phiformula = NULL, gammaformul
   # Make Input Data Tidy
   tidy.data <- tidy.dynam.occ(y, site, site.season, site.season.survey)
 
-  tidy.data.sort = arrange(tidy.data, Survey)  #Allows Looping Over Seasons w/o Skipping Rows with Multiple Surveys Per Season
+  tidy.data.sort = dplyr::arrange(tidy.data, Survey)  #Allows Looping Over Seasons w/o Skipping Rows with Multiple Surveys Per Season
 
   tidy.data.sort$SiteSeason <- rep(1:(nsite * nseason), times = nsurvey, each = 1)  #for nested indexing over latent states
 
@@ -167,7 +200,7 @@ nimble.dynamic.occ <- function(psiformula = NULL, phiformula = NULL, gammaformul
 
   # Full BUGS Code Expansion
   full.expand <- embedLinesInCurlyBrackets(lines = list(lm.expand.Site$code, lm.expand.Phi$code, lm.expand.Gamma$code, latent.mean, latent.phi, latent.z, lm.expand.P$code, Obs.Mod))
-  browser()
+
   # Make Factor Variables Numeric
   indx <- sapply(tidy.data.sort, is.factor)
   tidy.data.sort[indx] <- lapply(tidy.data.sort[indx], function(x) as.numeric(as.factor(x)))
@@ -186,7 +219,12 @@ nimble.dynamic.occ <- function(psiformula = NULL, phiformula = NULL, gammaformul
     inits.list[[i]] <- append(start.values, list(z = z))
   }
 
-  nimMod.obj <- nimbleModel(code = full.expand, constants = as.list(tidy.data.sort))
+  # NIMBLE settings
+  nimble::nimbleOptions(enableBUGSmodules = TRUE)
+  nimble::nimbleOptions(verbose = FALSE)
+  nimble::nimbleOptions(MCMCprogressBar = FALSE)
+
+  nimMod.obj <- nimble::nimbleModel(code = full.expand, constants = as.list(tidy.data.sort))
 
   if (burnin >= niter) {
     stop("Burnin Needs to Be Less Than the Number of Iterations")
@@ -216,5 +254,5 @@ nimble.dynamic.occ <- function(psiformula = NULL, phiformula = NULL, gammaformul
 
 
 #look <- nimble.dynamic.occ( ~1, ~Season, ~ 1 + Season*elev, ~Season, y = detection, site = sitevars,site.season = seasonsitevars, site.season.survey = pvars,
- #                             chains = 1, niter = 20, burnin = 10,  dropbase = FALSE)
+             #                chains = 1, niter = 20, burnin = 10,  dropbase = FALSE)
 

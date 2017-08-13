@@ -1,11 +1,4 @@
-### NIMBLE Dynamic Occupancy Models ###
-
-#library(nimble)
-# library(devtools) install_github('nimble-dev/nimble', ref = 'devel', subdir = 'packages/nimble')
-#library(tidyr)
-#library(reshape2)
-#library(coda)
-nimbleOptions(enableBUGSmodules = TRUE)
+### NIMBLE Dynamic Occupancy Models Utility Functions ###
 
 makeBUGSmodule <- function(fun) {
   ans <- structure(list(process = fun), class = "BUGSmodule")
@@ -25,7 +18,7 @@ tidy.dynam.occ <- function(y = NULL, site = NULL, season.site = NULL, season.sit
   nseason <- as.numeric(dim(y)[3])
 
   # Make Tidy Data for Y
-  y.tidy <- melt(y, varnames = c("Site", "Survey", "Season"), value.name = "y")
+  y.tidy <- reshape2::melt(y, varnames = c("Site", "Survey", "Season"), value.name = "y")
   y.tidy$Site <- y.tidy$Site
   y.tidy$Season <- as.factor(y.tidy$Season)
 
@@ -52,10 +45,10 @@ tidy.dynam.occ <- function(y = NULL, site = NULL, season.site = NULL, season.sit
       }
       colnames(mf) <- seq(1, nseason, 1)
       mf$Site <- as.numeric(rownames(mf))
-      covariates[[i + 1]] = melt(mf, id.vars = "Site", variable.name = "Season", value.name = site.season.vars[i])
+      covariates[[i + 1]] = reshape2::melt(mf, id.vars = "Site", variable.name = "Season", value.name = site.season.vars[i])
     }
 
-    season.site.tidy <- Reduce(function(dtf1, dtf2) left_join(dtf1, dtf2, by = c("Site", "Season")), covariates)
+    season.site.tidy <- Reduce(function(dtf1, dtf2) dplyr::left_join(dtf1, dtf2, by = c("Site", "Season")), covariates)
   }
 
   if (!is.null(season.site.survey)) {
@@ -68,13 +61,13 @@ tidy.dynam.occ <- function(y = NULL, site = NULL, season.site = NULL, season.sit
       if (is.array(season.site.survey[[i]]) == FALSE) {
         stop("Site Level Covariates Need to be Provided as An Array")
       }
-      mf <- melt(season.site.survey[[i]], varnames = c("Site", "Survey", "Season"), value.name = obs.vars[i])
+      mf <- reshape2::melt(season.site.survey[[i]], varnames = c("Site", "Survey", "Season"), value.name = obs.vars[i])
       if (dim(y.tidy)[1] != dim(mf)[1]) {
         stop("Number of Observations do Not Match Between Y and Covariates")
       }
       covariates[[i + 1]] = mf
     }
-    season.site.survey.tidy <- Reduce(function(dtf1, dtf2) left_join(dtf1, dtf2, by = c("Site", "Survey", "Season")), covariates)
+    season.site.survey.tidy <- Reduce(function(dtf1, dtf2) dplyr::left_join(dtf1, dtf2, by = c("Site", "Survey", "Season")), covariates)
     season.site.survey.tidy$Season <- as.factor(season.site.survey.tidy$Season)
   } else {
     season.site.survey.tidy = NULL
@@ -82,19 +75,19 @@ tidy.dynam.occ <- function(y = NULL, site = NULL, season.site = NULL, season.sit
 
 
   if (!is.null(season.site.survey.tidy)) {
-    final.tidy1 <- Reduce(function(dtf1, dtf2) left_join(dtf1, dtf2, by = c("Site", "Survey", "Season")), list(y.tidy, season.site.survey.tidy))
+    final.tidy1 <- Reduce(function(dtf1, dtf2) dplyr::left_join(dtf1, dtf2, by = c("Site", "Survey", "Season")), list(y.tidy, season.site.survey.tidy))
   } else {
     final.tidy1 <- y.tidy
   }
 
   if (!is.null(season.site)) {
-    final.tidy2 <- Reduce(function(dtf1, dtf2) left_join(dtf1, dtf2, by = c("Site", "Season")), list(final.tidy1, season.site.tidy))
+    final.tidy2 <- Reduce(function(dtf1, dtf2) dplyr::left_join(dtf1, dtf2, by = c("Site", "Season")), list(final.tidy1, season.site.tidy))
   } else {
     final.tidy2 <- final.tidy1
   }
 
   if (!is.null(site)) {
-    final.tidy3 <- Reduce(function(dtf1, dtf2) left_join(dtf1, dtf2, by = c("Site")), list(final.tidy2, site))
+    final.tidy3 <- Reduce(function(dtf1, dtf2) dplyr::left_join(dtf1, dtf2, by = c("Site")), list(final.tidy2, site))
   } else {
     final.tidy3 <- final.tidy2
   }

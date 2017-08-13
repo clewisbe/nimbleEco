@@ -12,69 +12,101 @@ nimble.dynamic.occ(psiformula = NULL, phiformula = NULL,
   returncode = TRUE, returnsamp = TRUE, ...)
 }
 \arguments{
-\item{psiformula}{A linear model formula for first year occupancy: \eqn{logit(\psi_{1})}.  Formula must start with a tilde (~).  Add 1 for an intercept.
-Random effects are specified with a pipe (e.g., (1|A)).  Interactions can be specified with * (e.g., x*y).}
+\item{psiformula}{A linear model formula for first year occupancy:
+\eqn{logit(\psi_{1})}.  Formula must start with a tilde (~).  Add -1 to
+remove intercept. Random effects are specified with a pipe (see
+\link[lme4]{glmer}).  If model contains an intercept random effects will be
+centered at 0.  Interactions can be specified with * (e.g., x*y).}
 
-\item{phiformula}{A linear model formula for survival probability: \eqn{logit(\phi_{i,k})}}
+\item{phiformula}{A linear model formula for survival probability:
+\eqn{logit(\phi_{i,k})}}
 
-\item{gammaformula}{A linear model formula for the probability of colonization: \eqn{logit(\gamma_{i,k})}.}
+\item{gammaformula}{A linear model formula for the probability of
+colonization: \eqn{logit(\gamma_{i,k})}.}
 
-\item{pformula}{A linear model formula for the probability of detection: \eqn{logit(\p_{i,j,k})}.}
+\item{pformula}{A linear model formula for the probability of detection:
+\eqn{logit(\p_{i,j,k})}.}
 
-\item{y}{Input as a 3 dimensinoal array (site, survey, season) with binary values: 1 for detection, 0 otherwise.}
+\item{y}{A 3 dimensinoal array (site, survey, season) with binary values: 1
+for detection, 0 otherwise.}
 
-\item{site}{A data frame or matrix.  Rows are sites and columns (with labels) are independent variables}
+\item{site}{A data frame or matrix.  Rows are sites and columns (with variable
+names) are independent variables.}
 
-\item{site.season}{A named list (rows site, columns season) with each list element corresponding to an independent variable}
+\item{site.season}{A named list (rows site, columns season) with each list
+element corresponding to an independent variable. Variables specified in the
+model must match the variable names in the list.}
 
-\item{site.season.survey}{A named list of arrays (site, survey, season) with each name corresponding to an independent variable}
+\item{site.season.survey}{A named list of arrays (site, survey, season) with
+each name corresponding to an independent variable. Variables specified in
+the model must match the variable names in the list.}
 
-\item{priors}{Prior options for all model parameters.  One prior is assigned to all model parameters specified in the siteformula and obsformula.  The default is a Normal(mu = 0, sd = 1).  Other options are
-t(mu = 0, tau = 1000, df = 5), Uniform(0, 1000), and Gamma(shape = .001, rate = .001).}
+\item{priors}{One prior is specified for all model parameters in the
+siteformula and obsformula model statements.  The default prior is a
+Normal(mu = 0, sd = 1).  Other options are t(mu = 0, tau = 1000, df = 5),
+Uniform(0, 1000), and Gamma(shape = .001, rate = .001).}
 
-\item{dropbase}{Drops the first level of a categorical variable.  Default is TRUE.}
+\item{dropbase}{Drops the first level of a factor variable.  Default is TRUE.}
 
-\item{droplast}{Drops the last level of a categorical variable.  Default is TRUE.}
+\item{droplast}{Drops the last level of a factor variable.  Default is TRUE.}
 
-\item{niter}{Number of iterations to run the MCMC.  Default is 10,000 iterations.}
+\item{niter}{Number of iterations to run the MCMC.  Default is 10,000
+iterations.}
 
-\item{burnin}{Number of burnin iterations for MCMC.  Default is 1000 iterations.}
+\item{burnin}{Number of burnin iterations for MCMC.  Default is 1000
+iterations.}
 
-\item{initmcmc}{Vector of initial values for MCMC.  Length of vector should equal the number of chains.  Default is c(1, 5, 10, 15)}
+\item{initmcmc}{Vector of initial values for MCMC.  Length of vector must
+equal the number of chains.  The same initial values are used for all
+parameters. Default is c(1, 5, 10, 15)}
 
 \item{chains}{Number of MCMC chains to run.  Default is 4.}
 
-\item{returncode}{Option to return the BUGS code passed to NIMBLE.  Default is TRUE.}
+\item{returncode}{Option to return the BUGS code passed to NIMBLE.  Default is
+TRUE.}
 
 \item{returnsamp}{Option to return all posterior draws.  Default is TRUE}
 
-\item{...}{User can specify different parameters for the priors.  Options are location, scale, lb, ub, df, shape, rate.}
+\item{...}{Additional arguments can be passed to specify different parameters
+for the priors.  Options are location, scale, lb, ub, df, shape, and rate.}
 }
 \value{
-The output will be a named list with the following elements: Summary, BUGScode, and Samples.  In the Summary statement, variables from the psiformula will start with "s.",
-variables in the phiformula will start with "phi.", variables from the gammaformula will start with "gam.", and variables from the pformula will start with "p.".  Also, note parameters are on the transformed scale (logit).
-In addition to quantiles, the effective sample size and Gelman Rubin diagnoistic are provided from the coda package.
+Output is a named list with the following elements: Summary, BUGScode,
+ and Samples.  In the Summary statement, variables from the psiformula will
+ start with "s.", variables in the phiformula will start with "phi.",
+ variables from the gammaformula will start with "gam.", and variables from
+ the pformula will start with "p.".  Also, note parameters are on the
+ transformed scale (logit). In addition to quantiles, the effective sample
+ size and Gelman Rubin diagnoistic are provided from the \link[coda]{coda}
+ package.
 }
 \description{
-\code{nimble.occ} returns generated BUGS code, model summary statistics, and posterior draws
+\code{nimble.dynamic.occ} is used to fit single species multi-season occupancy
+models using Bayesian estimation.  The function returns model summary
+statistics, posterior draws, and the BUGS code used to estimate the model.
 }
 \details{
-This is a function for fitting Multiseason Single Species Site Occupancy Models using a Bayeisan framework.  A basic structure of the type of model is:
-\deqn{z_{1} ~ Bernoulli(\psi_{1})}
-\deqn{z_{i,k} ~ Bernoulli(\psi_{i,k})}
+This is a function for fitting Multiseason Single Species Site Occupancy
+Models using a Bayeisan framework.  The model structure is: \deqn{z_{1} ~
+Bernoulli(\psi_{1})} \deqn{z_{i,k} ~ Bernoulli(\psi_{i,k})}
 \deqn{z_{k+1}|z_{k} ~ Bernoulli(z_{k} * \phi_{i,k} + (1-z{k}) * \gamma_{i,k})}
 \deqn{y_{i,j,k} | z_{i,k} ~ Bernoulli(z_{i,k} * p_{i,j,k})}
 
-Where i indexing site, j indexes survey, and k indexes the season. z is a binary latent variable for the true observed state (occupied or not occupied).
-The parameter \eqn{\psi_1{}} (first year occupancy) can be modeled as a linear function of site covariates; \eqn{\phi_{i,k}} (probability of local survial), and \eqn{\gamma_{i,k}}
-(colonization probabiliy) can all be modeled as linear functions of site and site.season covariates; and \eqn{p_{i,j,k}} (detection probability) can be modeled as a linear function of
-site, site.season, or site.season.survey covariates.  For all 3 models a logit link is used.    \cr \cr
- Estimation is performed using NIMBLE.  In addition to fitting the model, generated BUGS code for the full model,
-  as well as posterior draws are available.
+Where i indexing site, j indexes survey, and k indexes the season. z is a
+binary latent variable for the true observed state (occupied or not occupied).
+The parameter \eqn{\psi_1{}} (first year occupancy) can be modeled as a linear
+function of site covariates; \eqn{\phi_{i,k}} (probability of local survial),
+and \eqn{\gamma_{i,k}} (colonization probabiliy) can be modeled as linear
+functions of site and site.season covariates; and \eqn{p_{i,j,k}} (detection
+probability) can be modeled as a linear function of site, site.season, or
+site.season.survey covariates.  A logit link is used for all 3 models.    \cr
+\cr Estimation is performed using NIMBLE.  In addition to fitting the model,
+generated BUGS code for the full model, as well as posterior draws, are
+returned.
 }
 \examples{
 # Simualte Data from Kery and Schaub (p. 440): \\url{http://www.sciencedirect.com/science/book/9780123870209}
-R <- 250 #Number of Sites
+R <- 100 #Number of Sites
 J <- 3 #Number of Surveys
 K <- 10 #Number of Seasons
 psi1 <- 0.4 #First year occupancy probability
@@ -107,7 +139,7 @@ for (i in 1:R){
 
 
 #Fit Model
-model <- nimble.dynamic.occ(psiformula = ~ 1, phiformula = ~ Season, gammaformula = ~ Season, pformula = ~ Season, y = y, initmcmc = 1, chains = 1, dropbase = FALSE)
+model <- nimble.dynamic.occ(psiformula = ~ 1, phiformula = ~ -1 + Season, gammaformula = ~ -1 + Season, pformula = ~ -1 + Season, y = y, initmcmc = 1, chains = 1, dropbase = FALSE)
 
 
 }

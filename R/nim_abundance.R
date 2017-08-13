@@ -1,56 +1,87 @@
-#' Estimation of Abundance from Counts Using the Binomial Mixture Model.
+#'Estimation of Abundance from Counts Using Binomial Mixture Models.
 #'
-#' \code{nimble.abund} returns generated BUGS code, model summary statistics, and posterior draws
+#'\code{nimble.abund} is used to fit Binomial Mixture Models using Bayesian
+#'estimation.  The function returns model summary statistics, posterior draws,
+#'and the BUGS code used to estimate the model.
 #'
-#' This is a function for fitting Binomial Mixture Models using a Bayeisan framework.  A basic structure of the type of model is:
-#' \deqn{N_{i} ~ Poisson(\lambda_{i})}
-#' \deqn{y_{i,j} | N_{i} ~ Binomial(N_{i}, p_{i,j})}
-#' Where i is the number of sites and j the number of temporal replicates.  N is a latent variable for population size.
-#'   Both \eqn{\lambda} and p can be modeled as a linear function of covariates via a linked GLM.  The link for \eqn{\lambda} is the log link.  The link for p
-#'   is the logit link.  Estimation is performed using NIMBLE.  In addition to fitting the model, generated BUGS code for the full model,
-#'   as well as posterior draws are available.
-#'
-#'
-#' @param siteformula  A linear model formula for the latent state: \eqn{log(\lambda_{i})}.  Formula must start with a tilde (~).  Add 1 for an intercept.
-#' Random effects are specified with a pipe (e.g., (1|A)).  Interactions can be specified with * (e.g., x*y).
-#' @param obsformula A linear model formula for the observation process: \eqn{logit(p_{i,j})}.
-#' @param y The observed counts at site i during temporal replicate j.  Must be provided as either a matrix or dataframe. Rows are sites and columns are replicates.
-#' @param sitevars A dataframe of site-specific covariates.  Must be a dataframe with named columns corresponding to variables.  Number of rows should equal the number of sites.
-#' @param obsvars A named list with site and survey specific covariates.  Each list element is a matrix with rows corresponding to site and columns to replicate.
-#' Variables specific in model must match the names in the list.
-#' @param mixture There are three mixture options for the latent states: Poisson (default), Zero-Inflated Poisson (ZIP), and Negative Binomial (NB).  The ZIP mixture addeds another hierarchial layer to the model.
-#' The extra layer is a Bernoulli random variable that divides sites between positive counts and sites with 0 counts.  The NB link adds an extra term
-#' (rho) to model overdispersion.
-#' @param priors Prior options for all model parameters.  One prior is assigned to all model parameters specified in the siteformula and obsformula.  The default is a Normal(mu = 0, sd = 1000).  Other options are
-#' t(mu = 0, tau = 1000, df = 5), Uniform(0, 1000), and Gamma(shape = .001, rate = .001).
-#' @param dropbase  Drops the first level of a categorical variable.  Default is TRUE.
-#' @param droplast Drops the last level of a categorical variable.  Default is FALSE.
-#' @param niter Number of iterations to run the MCMC.  Default is 10,000 iterations.
-#' @param burnin Number of burnin iterations for MCMC.  Default is 1000 iterations.
-#' @param initmcmc Vector of initial values for MCMC.  Length of vector should equal the number of chains.  Default is c(1, 5, 10, 15)
-#' @param chains Number of MCMC chains to run.  Default is 4.
-#' @param returncode Option to return the BUGS code passed to NIMBLE.  Default is TRUE.
-#' @param returnsamp Option to return all posterior draws.  Default is TRUE
-#' @param ... User can specify different parameters for the priors.  Options are location, scale, lb, ub, df, shape, rate.
+#'This is a function for fitting Binomial Mixture Models using a Bayesian
+#'framework.  The model structure is: \deqn{N_{i} ~ Poisson(\lambda_{i})}
+#'\deqn{y_{i,j} | N_{i} ~ Binomial(N_{i}, p_{i,j})} Where i is the number of
+#'sites and j the number of temporal replicates.  N is a latent variable for
+#'population size. Both \eqn{\lambda} and p can be modeled as a linear function
+#'of covariates via a linked GLM.  The link for \eqn{\lambda} is the log link.
+#'The link for p is the logit link.  Estimation is performed using NIMBLE.  In
+#'addition to fitting the model, generated BUGS code for the full model, as well
+#'as posterior draws, are returned.
 #'
 #'
+#'@param siteformula  A linear model formula for the latent state:
+#'  \eqn{log(\lambda_{i})}.  Formula must start with a tilde (~).  Add -1 to
+#'  remove intercept. Random effects are specified with a pipe (see
+#'  \link[lme4]{glmer}).  If model contains an intercept random effects will be
+#'  centered at 0.  Interactions can be specified with * (e.g., x*y).
+#'@param obsformula A linear model formula for the observation process:
+#'  \eqn{logit(p_{i,j})}.
+#'@param y The observed counts at site i during temporal replicate j.  Must be
+#'  provided as either a matrix or dataframe. Rows are sites and columns are
+#'  replicates.
+#'@param sitevars A dataframe of site-specific covariates.  Must be a dataframe
+#'  with named columns corresponding to variables.  Number of rows should equal
+#'  the number of sites.
+#'@param obsvars A named list with site and survey specific covariates.  Each
+#'  list element is a matrix with rows corresponding to site and columns to
+#'  replicate. Variables specified in the model must match the variable names in
+#'  the list.
+#'@param mixture There are three mixture options for the latent states: Poisson
+#'  (default), Zero-Inflated Poisson (ZIP), and Negative Binomial (NB).  The ZIP
+#'  mixture adds an extra hierarchial layer to the model, which is a Bernoulli
+#'  random variable that divides sites between positive counts and sites with 0
+#'  counts.  The NB link adds an extra term (rho) to model overdispersion.
+#'@param priors One prior is specified for all model parameters in the
+#'  siteformula and obsformula model statements.  The default prior is a
+#'  Normal(mu = 0, sd = 1000).  Other options are t(mu = 0, tau = 1000, df = 5),
+#'  Uniform(0, 1000), and Gamma(shape = .001, rate = .001).
+#'@param dropbase  Drops the first level of a factor variable.  Default is TRUE.
+#'@param droplast Drops the last level of a factor variable.  Default is FALSE.
+#'@param niter Number of iterations to run the MCMC.  Default is 10,000
+#'  iterations.
+#'@param burnin Number of burnin iterations for MCMC.  Default is 1000
+#'  iterations.
+#'@param initmcmc Vector of initial values for MCMC.  Length of vector must
+#'  equal the number of chains.  The same initial values are used for all
+#'  parameters. Default is c(1, 5, 10, 15)
+#'@param chains Number of MCMC chains to run.  Default is 4.
+#'@param returncode Option to return the BUGS code passed to NIMBLE.  Default is
+#'  TRUE.
+#'@param returnsamp Option to return all posterior draws.  Default is TRUE
+#'@param ... Additional arguments can be passed to specify different parameters
+#'  for the priors.  Options are location, scale, lb, ub, df, shape, and rate.
 #'
-#' @return The output will be a named list with the following elements: Summary, BUGScode, and Samples.  In the Summary statement, variables from the siteformula will start with "s."
-#' and variables in the obsformula will start with "o."  Also, note parameters are on the transformed scale (log for siteformula variables; logit for obsformula variables).
-#' In addition to quantiles, the effective sample size and Gelman Rubin diagnoistic are provided from the coda package. \cr \cr
-#' If the ZIP mixture is selected theta is returned corresponding to the Bernoulli random variable modeling if a site is suitable for a positive abundance count \cr \cr
-#' If the NB mixture is selected  logalpha is returned, which is the log of the dispersion parameter, alpha, in the negative binomial distribution.
+#'
+#'
+#'@return Output is a named list with the following elements: Summary,
+#'  BUGScode, and Samples.  In the Summary statement, variables from the
+#'  siteformula will start with "s.", and variables in the obsformula will start
+#'  with "o."  Note: parameters are on the transformed scale (log for
+#'  siteformula variables; logit for obsformula variables). In addition to
+#'  quantiles, the effective sample size and Gelman Rubin diagnoistic are
+#'  provided from the \link[coda]{coda} package. \cr \cr If the ZIP mixture is
+#'  selected theta is returned corresponding to the Bernoulli random variable
+#'  modeling if a site is suitable for a positive abundance count. \cr \cr If
+#'  the NB mixture is selected  logalpha is returned, which is the log of the
+#'  dispersion parameter, alpha, in the NB distribution.
 #'
 #'
 #'
-#' @author Colin Lewis-Beck
+#'@author Colin Lewis-Beck
 #'
 #' @examples
-#' # Simualte Data from Kery and Schaub (p. 391): \url{http://www.sciencedirect.com/science/book/9780123870209}
-#' R <- 200
+#' # Simulate Abundance Data
+#' R <- 75
 #' T <- 3
 #' X <- runif(n = R, min = -1, max = 1)
-#' sim.covariates <- as.data.frame(X)
+#' A = c(rep('Red', 25), rep('Orange',20), rep('Blue', 30))
+#' sim.covariates <- data.frame("X" = X, "A" = A)
 #' lam <- exp(1 + 3*X)
 #' N <- rpois(n = R, lambda = lam)
 #' p <- plogis(-5*X)
@@ -58,9 +89,8 @@
 #' for (i in 1:T){y[,i] <- rbinom(n = R, size = N, prob =p)}
 #'
 #'
-#'
 #' #Fit Model
-#'model <- nimble.abund(siteformula = ~ 1 + X, obsformula = ~ 1 + X, y = y, sitevars = sim.covariates, initmcmc = 1, chains = 1)
+#'model <- nimble.abund(siteformula = ~ 1 + (1|A) + X, obsformula = ~ X, y = y, sitevars = sim.covariates, initmcmc = 1, chains = 1)
 #'
 #'
 #'@export
@@ -70,12 +100,6 @@ nimble.abund <- function(siteformula = NULL, obsformula = NULL, y = NULL, siteva
 
   cl <- match.call.defaults()
   mf <- match.call(expand.dots = FALSE)
-
-  prior.params = list(...)
-  argnames <- names(prior.params)
-
-  mixture <- match.arg(mixture, c("Poisson", "ZIP", "NB"))
-  cl$priors <- match.arg(priors, c("Normal", "t", "Uniform", "Gamma"))
 
   obsform <- as.formula(mf$obsformula)
   stateform <- as.formula(mf$siteformula)
@@ -87,6 +111,13 @@ nimble.abund <- function(siteformula = NULL, obsformula = NULL, y = NULL, siteva
   if (length(initmcmc) != chains) {
     stop("Number of initial values must equal number of MCMC chains")
   }
+
+  prior.params = list(...)
+  argnames <- names(prior.params)
+
+  mixture <- match.arg(mixture, c("Poisson", "ZIP", "NB"))
+  cl$priors <- match.arg(priors, c("Normal", "t", "Uniform", "Gamma"))
+
 
   df <- maketidy(y, sitevars, obsvars)  #Munge 3 Data Objects into One Tidy DataFrame
 
@@ -104,6 +135,7 @@ nimble.abund <- function(siteformula = NULL, obsformula = NULL, y = NULL, siteva
   factors <- names(Filter(is.factor, df))
   factors.size <- lapply(factors, factor.bracket, df)
 
+
   # Make Site Level Formula
   LHS.Site <- substitute(N[1:L], list(L = S))
   RHS.Site <- make.glm(mf$siteformula, factors.size, cl = cl, mixture, "log", level = quote(site), prior.params = prior.params)
@@ -117,13 +149,12 @@ nimble.abund <- function(siteformula = NULL, obsformula = NULL, y = NULL, siteva
   glm.expand.Site <- nim_glm$process(LHS.Site, RHS.Site)
   glm.expand.Obs <- nim_glm$process(LHS.Obs, RHS.Obs)
 
-
   lm.expand.Site <- lmPredictor$process(glm.expand.Site$LHS, glm.expand.Site$RHS)
   lm.expand.Obs <- lmPredictor$process(glm.expand.Obs$LHS, glm.expand.Obs$RHS)
 
+
   # Full BUGS Code Expansion
   full.expand <- embedLinesInCurlyBrackets(lines = list(glm.expand.Site$prob.mod, lm.expand.Site$code, glm.expand.Obs$prob.mod, lm.expand.Obs$code))
-
   # Get Data and Model Ready for nimbleModel and MCMC
 
   # Make Factor Variables Numeric for NIMBLE
@@ -151,9 +182,14 @@ nimble.abund <- function(siteformula = NULL, obsformula = NULL, y = NULL, siteva
     inits.list[[i]] <- append(start.values, list(N = N))
   }
 
-  nimMod.obj <- nimbleModel(code = full.expand, constants = as.list(df), data = list(y = df$Count))
+  # NIMBLE settings
+  nimble::nimbleOptions(enableBUGSmodules = TRUE)
+  nimble::nimbleOptions(verbose = FALSE)
+  nimble::nimbleOptions(MCMCprogressBar = FALSE)
 
-  if (burnin >= niter) {
+  nimMod.obj <- nimble::nimbleModel(code = full.expand, constants = as.list(df), data = list(y = df$Count))
+
+    if (burnin >= niter) {
     stop("Burnin Needs to Be Less Than the Number of Iterations")
   }
 
@@ -178,3 +214,6 @@ nimble.abund <- function(siteformula = NULL, obsformula = NULL, y = NULL, siteva
   }
   return(results)
 }
+
+#look <- nimble.abund(siteformula = ~ xm + (xm|A), obsformula = ~ xm, mixture = "Poisson", y = abundance.sim$y, sitevars = abundance.sim$sitevars, chains = 1,
+ #                  initmcmc = 1, priors = "Normal", location = 0, scale = 1)

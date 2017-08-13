@@ -1,10 +1,4 @@
-### NIMBLE ABUNDANCE N Mixture Models for Repeated count Data ###
-#library(nimble)
-# library(devtools) install_github('nimble-dev/nimble', ref = 'devel', subdir = 'packages/nimble')
-#library(tidyverse)
-#library(coda)
-#nimbleOptions(enableBUGSmodules = TRUE)
-
+### Utility Functions for Abundance N Mixture Models and Single Season Occupancy  ###
 
 makeBUGSmodule <- function(fun) {
   ans <- structure(list(process = fun), class = "BUGSmodule")
@@ -13,7 +7,7 @@ makeBUGSmodule <- function(fun) {
 
 # Helper function to gather data
 gatherfctn <- function(mydata, key.col, val.col, gather.cols) {
-  new.data <- gather_(data = mydata, key_col = key.col, value_col = val.col, gather_cols = colnames(mydata)[gather.cols])
+  new.data <- tidyr::gather_(data = mydata, key_col = key.col, value_col = val.col, gather_cols = colnames(mydata)[gather.cols])
   return(new.data)
 }
 
@@ -30,7 +24,7 @@ maketidy <- function(y, sitevars = NULL, obsvars = NULL) {
   VisitID <- paste("Visit", 1:L, sep = "")
   colnames(y) <- VisitID
   y$Site <- as.numeric(rownames(y))
-  long.y <- gather(y, Visit, Count, 1:L)
+  long.y <- tidyr::gather(y, Visit, Count, 1:L)
 
 
   # Site Variables
@@ -44,7 +38,7 @@ maketidy <- function(y, sitevars = NULL, obsvars = NULL) {
     }
 
     # Join Response with Site Level Variables
-    final.df[[1]] <- left_join(long.y, sitevars, by = "Site")
+    final.df[[1]] <- dplyr::left_join(long.y, sitevars, by = "Site")
   } else {
     final.df[[1]] <- long.y
   }
@@ -63,7 +57,7 @@ maketidy <- function(y, sitevars = NULL, obsvars = NULL) {
       final.df[[i + 1]] <- gatherfctn(mf, "Visit", varnames.obs[i], 1:L)
     }
   }
-  return(Reduce(function(dtf1, dtf2) left_join(dtf1, dtf2, by = c("Site", "Visit")), final.df))
+  return(Reduce(function(dtf1, dtf2) dplyr::left_join(dtf1, dtf2, by = c("Site", "Visit")), final.df))
 }
 
 
@@ -774,6 +768,7 @@ lmPredictor <- makeBUGSmodule(function(LHS, RHS) {
     gsub(" ", "", x, fixed = TRUE)
   })
 
+
   RHS.fix.tm <- list()
   RHS.random.tm <- list()
 
@@ -785,13 +780,25 @@ lmPredictor <- makeBUGSmodule(function(LHS, RHS) {
     }
   }
 
-  # Drop Null Slots.  Look into Vectorizing
+  # Drop Null Slots.
   RHS.fix.tm <- RHS.fix.tm[!sapply(RHS.fix.tm, is.null)]
   RHS.random.tm <- RHS.random.tm[!sapply(RHS.random.tm, is.null)]
 
+  #Make Intercept a Default Option
+  RM <- FALSE
+  if(any(sapply(RHS.fix.tm, function(x)  -1 %in% x)) == TRUE){
+    RHS.fix.tm <- RHS.fix.tm[-sapply(RHS.fix.tm, function(x)  -1 %in% x)]
+    RM <- TRUE
+  }
+
+  if(any(sapply(RHS.fix.tm, function(x)  1 %in% x)) == FALSE & RM ==FALSE){
+    RHS.fix.tm <- append(RHS.fix.tm, "1")
+  }
+
+
 
   index.name <- quote(i)
-  int.check <- sum(!(is.na(sapply(terms.list, function(x) pmatch("1", x)))))
+  int.check <- sum(!(is.na(sapply(RHS.fix.tm, function(x) pmatch("1", x)))))
 
 
   # Generate Terms and Priors for Fixed Terms
@@ -858,13 +865,13 @@ lmPred2init <- function(term, value) {
 
 # Call Nimble and Pass the BUGS code and data
 callNim <- function(modobj, initial, niter, burn, chains) {
-  nimMod.C <- compileNimble(modobj)
+  nimMod.C <- nimble::compileNimble(modobj)
 
   # Set Up MCMC
-  config.Mod <- configureMCMC(nimMod.C, print = FALSE)
-  mod.MCMC <- buildMCMC(config.Mod)
-  C.mod.MCMC <- compileNimble(mod.MCMC)
-  samplesList <- runMCMC(C.mod.MCMC, inits = initial, niter = niter, nburnin = burn, nchains = chains, returnCodaMCMC = TRUE)
+  config.Mod <- nimble::configureMCMC(nimMod.C, print = FALSE)
+  mod.MCMC <- nimble::buildMCMC(config.Mod)
+  C.mod.MCMC <- nimble::compileNimble(mod.MCMC)
+  samplesList <- nimble::runMCMC(C.mod.MCMC, inits = initial, niter = niter, nburnin = burn, nchains = chains, returnCodaMCMC = TRUE)
   return(samplesList)
 }
 
@@ -874,8 +881,8 @@ callNim <- function(modobj, initial, niter, burn, chains) {
 makeoutput <- function(codaobj, sitevars, obsvars) {
   quantile <- summary(codaobj)$quantiles
   meansd <- summary(codaobj)$statistics[, 1:2]
-  rhat <- tryCatch(gelman.diag(codaobj, multivariate = FALSE)$psrf, error = function(e) NA)
-  Effsamp <- effectiveSize(codaobj)
+  rhat <- tryCatch(coda::gelman.diag(codaobj, multivariate = FALSE)$psrf, error = function(e) NA)
+  Effsamp <- coda::effectiveSize(codaobj)
   output <- as.data.frame(cbind(meansd, quantile, rhat, Effsamp))
   names(output)[names(output) == "Point est."] <- "Rhat"
   output$`Upper C.I.` <- NULL
