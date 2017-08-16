@@ -88,7 +88,7 @@
 #' y <- matrix(NA, nrow = R, ncol = T)
 #' for (i in 1:T){y[,i] <- rbinom(n = R, size = N, prob =p)}
 #'
-#'
+
 #' #Fit Model
 #'model <- nimble.abund(siteformula = ~ 1 + (1|A) + X, obsformula = ~ X, y = y, sitevars = sim.covariates, initmcmc = 1, chains = 1)
 #'
