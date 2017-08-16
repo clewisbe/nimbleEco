@@ -9,17 +9,6 @@ matrix:
 
 warnings_are_errors: true
 
-notifications:
-  email:
-    recipients:
-      - dbt1@williams.edu
-    on_success: always
-    on_failure: always
-
-branches:
-  only:
-    - devel
-
 latex: false  # Work around tlmgr issues.
 
 install:
