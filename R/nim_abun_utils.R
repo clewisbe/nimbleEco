@@ -454,7 +454,7 @@ nim_glm <- makeBUGSmodule(function(LHS, RHS) {
   }
 
   # Set up RHS
-  lpred <- call("lmPred", RHSargs$mod)
+  lpred <- call("lmPredictor", RHSargs$mod)
   lpred[[3]] <- RHSargs$factors
   lpred[[4]] <- RHSargs$priors
   lpred[[5]] <- RHSargs$prior.shape

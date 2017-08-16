@@ -7,9 +7,10 @@ Depends: R (>= 3.2.5)
 Imports:
   coda,
   dplyr,
+  methods,
   nimble,
   reshape2,
-  tidyr
+  tidyr,
 License: GPL-3
 Encoding: UTF-8
 LazyData: true

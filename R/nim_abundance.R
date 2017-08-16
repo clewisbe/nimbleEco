@@ -214,6 +214,3 @@ nimble.abund <- function(siteformula = NULL, obsformula = NULL, y = NULL, siteva
   }
   return(results)
 }
-
-#look <- nimble.abund(siteformula = ~ xm + (xm|A), obsformula = ~ xm, mixture = "Poisson", y = abundance.sim$y, sitevars = abundance.sim$sitevars, chains = 1,
- #                  initmcmc = 1, priors = "Normal", location = 0, scale = 1)
