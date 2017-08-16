@@ -14,3 +14,4 @@ TEMP*
 MyMakevars
 #*.R
 .Rproj.user
+*.Rcheck
