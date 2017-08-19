@@ -3,12 +3,11 @@ Title: Fit Ecological Models Using NIMBLE
 Version: 0.0.0.9000
 Authors@R: person("Colin", "Lewis-Beck", email = "clewisbe@iastate.edu", role = c("cre"))
 Description: Uses the NIMBLE software to fit a variety of ecological statistical models.
-Depends: R (>= 3.2.5)
+Depends: R (>= 3.2.5), nimble
 Imports:
   coda,
   dplyr,
   methods,
-  nimble,
   reshape2,
   tidyr,
 License: GPL-3

@@ -84,6 +84,7 @@
 nimble.occ <- function(siteformula = NULL, obsformula = NULL, y = NULL, sitevars = NULL, obsvars = NULL, priors = c("Normal", "t", "Uniform", "Gamma"),
                          dropbase = TRUE, droplast = FALSE, niter = 10000, burnin = 1000, initmcmc = c(.5, 1, 5, 10), chains = 4, returncode = TRUE, returnsamp = TRUE, ...) {
 
+
   cl <- match.call.defaults()
   mf <- match.call(expand.dots = FALSE)
 
