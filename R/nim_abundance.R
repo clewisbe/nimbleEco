@@ -122,7 +122,7 @@ nimble.abund <- function(siteformula = NULL, obsformula = NULL, y = NULL, siteva
   df <- maketidy(y, sitevars, obsvars)  #Munge 3 Data Objects into One Tidy DataFrame
 
   # Length of Tidy df
-  L <- as.numeric(dim(df)[1])
+  len <- as.numeric(dim(df)[1])
 
   # No. Sites
   S <- as.numeric(dim(y)[1])
@@ -141,7 +141,7 @@ nimble.abund <- function(siteformula = NULL, obsformula = NULL, y = NULL, siteva
   RHS.Site <- make.glm(mf$siteformula, factors.size, cl = cl, mixture, "log", level = quote(site), prior.params = prior.params)
 
   # Make Obs Level Formula
-  LHS.Obs <- substitute(y[1:S], list(S = L))
+  LHS.Obs <- substitute(y[1:S], list(S = len))
   RHS.Obs <- make.glm(mf$obsformula, factors.size, cl = cl, "Binomial", "logit", N = quote(N), Site = quote(Site), level = quote(obs),
                       prior.params = prior.params)
 
