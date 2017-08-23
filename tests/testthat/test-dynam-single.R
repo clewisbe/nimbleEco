@@ -1,4 +1,5 @@
-source(system.file(file.path('tests', 'test_utils.R'), package = 'nimbleEcology'))
+#source(system.file(file.path('/tests/testhat', 'test_utils.R'), package = 'nimbleEcology'))
+source("test_utils.R")
 
 context("Testing default MCMC Single Season Dynamic Occupancy Models")
 
@@ -17,7 +18,8 @@ nimbleProgressBarSetting <- nimbleOptions('MCMCprogressBar')
 nimbleOptions(MCMCprogressBar = FALSE)
 
 ## Tests Single Season Dynamic Occupancy Models
-dyn.single.gold <- readRDS(system.file("testdata", 'dynamic.single.gold.rds', package="nimbleEcology"))
+#dyn.single.gold <- readRDS(system.file("testdata", 'dynamic.single.gold.rds', package="nimbleEcology"))
+dyn.single.gold <- readRDS("../testdata/dynamic.single.gold.rds")
 
 test_that("mcmc compare single dyn occu",{
   for (i in 1:1){

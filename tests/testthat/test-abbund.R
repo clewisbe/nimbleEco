@@ -1,4 +1,5 @@
-source(system.file(file.path('tests', 'test_utils.R'), package = 'nimbleEcology'))
+#source(system.file(file.path('tests', 'test_utils.R'), package = 'nimbleEcology'))
+source("test_utils.R")
 
 context("Testing default MCMC Abundance Models")
 
@@ -17,10 +18,11 @@ nimbleProgressBarSetting <- nimbleOptions('MCMCprogressBar')
 nimbleOptions(MCMCprogressBar = FALSE)
 
 ## Tests Abundance Models
-abund.gold <- readRDS(system.file("testdata", 'abundance.gold.rds',package="nimbleEcology"))
+#abund.gold <- readRDS(system.file("testdata", 'abundance.gold.rds',package="nimbleEcology"))
+abund.gold <- readRDS("../testdata/abundance.gold.rds")
 
 test_that("mcmc compare abund",{
-          for (i in 8:8){
+          for (i in 1:12){
           test_mcmc(all.abund.mod[[i]], "abundance", seed = 1, gold = abund.gold[[i]], compare = TRUE, mod = i)
             }
         })

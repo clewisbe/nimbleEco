@@ -3,6 +3,7 @@
 export(nimble.abund)
 export(nimble.dynamic.occ)
 export(nimble.occ)
+import(nimble)
 importFrom(coda,effectiveSize)
 importFrom(coda,gelman.diag)
 importFrom(dplyr,left_join)

@@ -40,15 +40,18 @@ all.dynam.occup.mod <-namedList(mod.dyn1)
 
 test_mcmc <- function(model, data, inits = 1, iter = 10, burnin = 5 , mixture = "Poisson", seed = 1, gold = NULL, compare = TRUE, mod = NULL){
   if (data == "abundance"){
-    dat <- readRDS(system.file("testdata", 'abundance.sim.rds', package="nimbleEcology"))
+    dat <- readRDS("../testdata/abundance.sim.rds")
+    #dat <- readRDS(system.file("testdata", 'abundance.sim.rds', package="nimbleEcology"))
     M <- quote(nimble.abund)
   }
   if (data == "occupancy"){
-    dat <- readRDS(system.file("testdata", 'occupancy.sim.rds', package="nimbleEcology"))
+    dat <- readRDS("../testdata/occupancy.sim.rds")
+    #dat <- readRDS(system.file("testdata", 'occupancy.sim.rds', package="nimbleEcology"))
     M <- quote(nimble.occ)
   }
   if (data == "dynoccup"){
-    dat <- readRDS(system.file("testdata", 'dynam.sim.rds', package="nimbleEcology"))
+    dat <- readRDS("../testdata/dynam.sim.rds")
+    #dat <- readRDS(system.file("testdata", 'dynam.sim.rds', package="nimbleEcology"))
     M <- quote(nimble.dynamic.occ)
   }
 

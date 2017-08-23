@@ -24,7 +24,7 @@ maketidy <- function(y, sitevars = NULL, obsvars = NULL) {
   VisitID <- paste("Visit", 1:L, sep = "")
   colnames(y) <- VisitID
   y$Site <- as.numeric(rownames(y))
-  long.y <- tidyr::gather(y, Visit, Count, 1:L)
+  long.y <- tidyr::gather(y, "Visit", "Count", 1:L)
 
 
   # Site Variables

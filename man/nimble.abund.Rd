@@ -14,8 +14,9 @@ nimble.abund(siteformula = NULL, obsformula = NULL, y = NULL,
 \item{siteformula}{A linear model formula for the latent state:
 \eqn{log(\lambda_{i})}.  Formula must start with a tilde (~).  Add -1 to
 remove intercept. Random effects are specified with a pipe (see
-\link[lme4]{glmer}).  If model contains an intercept random effects will be
-centered at 0.  Interactions can be specified with * (e.g., x*y).}
+\href{https://www.rdocumentation.org/packages/lme4/versions/1.1-13/topics/lmer}{lmer}).
+If model contains an intercept, random effects will be centered at 0.
+Interactions are specified with * (e.g., x*y).}
 
 \item{obsformula}{A linear model formula for the observation process:
 \eqn{logit(p_{i,j})}.}
@@ -30,7 +31,7 @@ the number of sites.}
 
 \item{obsvars}{A named list with site and survey specific covariates.  Each
 list element is a matrix with rows corresponding to site and columns to
-replicate. Variables specified in the model must match the variable names in
+replicate. Variables specified in the model formula must match the variable names in
 the list.}
 
 \item{mixture}{There are three mixture options for the latent states: Poisson
@@ -69,17 +70,17 @@ TRUE.}
 for the priors.  Options are location, scale, lb, ub, df, shape, and rate.}
 }
 \value{
-Output is a named list with the following elements: Summary,
- BUGScode, and Samples.  In the Summary statement, variables from the
- siteformula will start with "s.", and variables in the obsformula will start
- with "o."  Note: parameters are on the transformed scale (log for
- siteformula variables; logit for obsformula variables). In addition to
- quantiles, the effective sample size and Gelman Rubin diagnoistic are
- provided from the \link[coda]{coda} package. \cr \cr If the ZIP mixture is
- selected theta is returned corresponding to the Bernoulli random variable
- modeling if a site is suitable for a positive abundance count. \cr \cr If
- the NB mixture is selected  logalpha is returned, which is the log of the
- dispersion parameter, alpha, in the NB distribution.
+Output is a named list with the following elements: Summary, BUGScode,
+ and Samples.  In the Summary statement, variables from the siteformula will
+ start with "s.", and variables in the obsformula will start with "o."  Note:
+ parameters are on the transformed scale (log for siteformula variables;
+ logit for obsformula variables). In addition to quantiles, the effective
+ sample size \link[coda]{effectiveSize} and Gelman Rubin diagnoistic
+ \link[coda]{gelman.diag} are provided from the coda  package. \cr \cr If the
+ ZIP mixture is selected theta is returned corresponding to the Bernoulli
+ random variable modeling if a site is suitable for a positive abundance
+ count. \cr \cr If the NB mixture is selected log(alpha) is returned:
+ the log of the dispersion parameter, alpha, in the NB distribution.
 }
 \description{
 \code{nimble.abund} is used to fit Binomial Mixture Models using Bayesian
@@ -111,7 +112,8 @@ y <- matrix(NA, nrow = R, ncol = T)
 for (i in 1:T){y[,i] <- rbinom(n = R, size = N, prob =p)}
 
 #Fit Model
-model <- nimble.abund(siteformula = ~ 1 + (1|A) + X, obsformula = ~ X, y = y, sitevars = sim.covariates, initmcmc = 1, chains = 1)
+model <- nimble.abund(siteformula = ~ 1 + (1|A) + X, obsformula = ~
+X, y = y, sitevars = sim.covariates, initmcmc = 1, chains = 1)
 
 
 }

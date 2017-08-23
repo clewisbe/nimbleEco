@@ -15,8 +15,9 @@ nimble.dynamic.occ(psiformula = NULL, phiformula = NULL,
 \item{psiformula}{A linear model formula for first year occupancy:
 \eqn{logit(\psi_{1})}.  Formula must start with a tilde (~).  Add -1 to
 remove intercept. Random effects are specified with a pipe (see
-\link[lme4]{glmer}).  If model contains an intercept random effects will be
-centered at 0.  Interactions can be specified with * (e.g., x*y).}
+\href{https://www.rdocumentation.org/packages/lme4/versions/1.1-13/topics/lmer}{lmer}).
+If model contains an intercept random effects will be centered at 0.
+Interactions can be specified with * (e.g., x*y).}
 
 \item{phiformula}{A linear model formula for survival probability:
 \eqn{logit(\phi_{i,k})}}
@@ -25,7 +26,7 @@ centered at 0.  Interactions can be specified with * (e.g., x*y).}
 colonization: \eqn{logit(\gamma_{i,k})}.}
 
 \item{pformula}{A linear model formula for the probability of detection:
-\eqn{logit(\p_{i,j,k})}.}
+\eqn{logit(p{i,j,k})}.}
 
 \item{y}{A 3 dimensinoal array (site, survey, season) with binary values: 1
 for detection, 0 otherwise.}
@@ -77,11 +78,11 @@ Output is a named list with the following elements: Summary, BUGScode,
  variables from the gammaformula will start with "gam.", and variables from
  the pformula will start with "p.".  Also, note parameters are on the
  transformed scale (logit). In addition to quantiles, the effective sample
- size and Gelman Rubin diagnoistic are provided from the \link[coda]{coda}
- package.
+ size \link[coda]{effectiveSize} and Gelman Rubin diagnoistic
+ \link[coda]{gelman.diag} are provided from the coda package.
 }
 \description{
-\code{nimble.dynamic.occ} is used to fit single species multi-season occupancy
+\code{nimble.dynamic.occ} fits single species multi-season occupancy
 models using Bayesian estimation.  The function returns model summary
 statistics, posterior draws, and the BUGS code used to estimate the model.
 }
@@ -94,7 +95,7 @@ Bernoulli(\psi_{1})} \deqn{z_{i,k} ~ Bernoulli(\psi_{i,k})}
 
 Where i indexing site, j indexes survey, and k indexes the season. z is a
 binary latent variable for the true observed state (occupied or not occupied).
-The parameter \eqn{\psi_1{}} (first year occupancy) can be modeled as a linear
+The parameter \eqn{\psi_{1}} (first year occupancy) can be modeled as a linear
 function of site covariates; \eqn{\phi_{i,k}} (probability of local survial),
 and \eqn{\gamma_{i,k}} (colonization probabiliy) can be modeled as linear
 functions of site and site.season covariates; and \eqn{p_{i,j,k}} (detection
@@ -105,41 +106,24 @@ generated BUGS code for the full model, as well as posterior draws, are
 returned.
 }
 \examples{
-# Simualte Data from Kery and Schaub (p. 440): \\url{http://www.sciencedirect.com/science/book/9780123870209}
-R <- 100 #Number of Sites
-J <- 3 #Number of Surveys
-K <- 10 #Number of Seasons
-psi1 <- 0.4 #First year occupancy probability
-psi <- rep(NA, K)
-muZ <- z <- array(dim = c(R, K))
-y <- array(NA, dim = c(R, J, K))
-psi[1] <- psi1
-p <- runif(n = K, min = 0.20, max = 0.40)
-phi <- runif(n = K-1, min = 0.60, max = 0.80)
-gamma <- runif(n = K-1, min = 0, max = 0.10)
+# Simualte Data R <- 100 #Number of Sites J <- 3 #Number of Surveys K <- 10
+#Number of Seasons psi1 <- 0.4 #First year occupancy probability psi <-
+rep(NA, K) muZ <- z <- array(dim = c(R, K)) y <- array(NA, dim = c(R, J, K))
+psi[1] <- psi1 p <- runif(n = K, min = 0.20, max = 0.40) phi <- runif(n =
+K-1, min = 0.60, max = 0.80) gamma <- runif(n = K-1, min = 0, max = 0.10)
 
-#Generate Occurance states
-z[,1] <- rbinom(R, 1, psi[1])
-for (i in 1:R){
- for (k in 2:K){
-   muZ[k] <- z[i, k-1]*phi[k-1] + (1-z[i,k-1])*gamma[k-1]
-   z[i,k] <- rbinom(1,1,muZ[k])
-   }
- }
-#Generate detection/nondetection data
-for (i in 1:R){
-  for(k in 1:K){
-  prob <- z[i,k]*p[k]
-  for (j in 1:J){
-     y[i,j,k] <- rbinom(1, 1, prob)
-     }
-   }
- }
+#Generate Occurance states z[,1] <- rbinom(R, 1, psi[1]) for (i in 1:R){ for
+(k in 2:K){ muZ[k] <- z[i, k-1]*phi[k-1] + (1-z[i,k-1])*gamma[k-1] z[i,k] <-
+rbinom(1,1,muZ[k]) } }
 
+#Generate detection/nondetection data for (i in 1:R){ for(k in 1:K){ prob <-
+z[i,k]*p[k] for (j in 1:J){ y[i,j,k] <- rbinom(1, 1, prob) } } }
 
 
 #Fit Model
-model <- nimble.dynamic.occ(psiformula = ~ 1, phiformula = ~ -1 + Season, gammaformula = ~ -1 + Season, pformula = ~ -1 + Season, y = y, initmcmc = 1, chains = 1, dropbase = FALSE)
+model <- nimble.dynamic.occ(psiformula = ~ 1, phiformula = ~ -1 +
+Season, gammaformula = ~ -1 + Season, pformula = ~ -1 + Season, y = y,
+initmcmc = 1, chains = 1, dropbase = FALSE)
 
 
 }

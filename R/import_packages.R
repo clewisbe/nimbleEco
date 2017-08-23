@@ -4,5 +4,6 @@
 #' @importFrom reshape2 melt
 #' @importFrom methods is
 #' @importFrom stats as.formula reformulate setNames
+#' @import nimble
 #'
 NULL

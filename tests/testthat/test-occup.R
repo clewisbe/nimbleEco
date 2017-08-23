@@ -1,4 +1,5 @@
-source(system.file(file.path('tests', 'test_utils.R'), package = 'nimbleEcology'))
+#source(system.file(file.path('tests', 'test_utils.R'), package = 'nimbleEcology'))
+source("test_utils.R")
 
 context("Testing default MCMC Occupancy Models")
 
@@ -17,7 +18,8 @@ nimbleProgressBarSetting <- nimbleOptions('MCMCprogressBar')
 nimbleOptions(MCMCprogressBar = FALSE)
 
 ## Tests Occupancy Models
-occu.gold <- readRDS(system.file("testdata", 'occupancy.gold.rds', package="nimbleEcology"))
+#occu.gold <- readRDS(system.file("testdata", 'occupancy.gold.rds', package="nimbleEcology"))
+occu.gold <- readRDS("../testdata/occupancy.gold.rds")
 
 test_that("mcmc compare occup",{
           for (i in 1:12){

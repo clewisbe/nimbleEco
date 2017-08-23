@@ -13,9 +13,10 @@ nimble.occ(siteformula = NULL, obsformula = NULL, y = NULL,
 \arguments{
 \item{siteformula}{A linear model formula for the latent state:
 \eqn{log(\lambda_{i})}.  Formula must start with a tilde (~).  Add -1 to
-remove intercept. Random effects are specified with a pipe (see
-\link[lme4]{glmer}).  If model contains an intercept random effects will be
-centered at 0.  Interactions can be specified with * (e.g., x*y).}
+remove intercept. Random effects are specified with a pipe  (see
+\href{https://www.rdocumentation.org/packages/lme4/versions/1.1-13/topics/lmer}{lmer}).
+ If model contains an intercept random effects will be centered at 0.
+Interactions can be specified with * (e.g., x*y).}
 
 \item{obsformula}{A linear model formula for the observation process:
 \eqn{logit(p_{i,j})}.}
@@ -63,13 +64,13 @@ TRUE.}
 for the priors.  Options are location, scale, lb, ub, df, shape, and rate.}
 }
 \value{
-Output is a named list with the following elements: Summary,
- BUGScode, and Samples.  In the Summary statement, variables from the
- siteformula will start with "s.", and variables in the obsformula will start
- with "o."  Note: parameters are on the transformed scale (log for
- siteformula variables; logit for obsformula variables). In addition to
- quantiles, the effective sample size and Gelman Rubin diagnoistic are
- provided from the \link[coda]{coda} package.
+Output is a named list with the following elements: Summary, BUGScode,
+ and Samples.  In the Summary statement, variables from the siteformula will
+ start with "s.", and variables in the obsformula will start with "o."  Note:
+ parameters are on the transformed scale (log for siteformula variables;
+ logit for obsformula variables). In addition to quantiles, the effective
+ sample size \link[coda]{effectiveSize} and Gelman Rubin diagnoistic
+ \link[coda]{gelman.diag} are provided from the coda  package.
 }
 \description{
 \code{nimble.occ} is used to fit single species single-season occupancy models
@@ -78,14 +79,14 @@ posterior draws, and the BUGS code used to estimate the model.
 }
 \details{
 This is a function for fitting Single Season-Occupany Models using a Bayeisan
-framework.  The model structure is: \deqn{z_{i} ~
-Bernoulli(\psi_{i})} \deqn{y_{i,j} | z_{i} ~ Bernoulli(z_{i} * p_{i,j})} Where
-i is the number of sites and j the number of temporal replicates. z is a
-binary latent variable for the true observed state (occupied or not occupied).
-Both \eqn{\psi} and p can be modeled as a linear function of covariates via a
-linked GLM.  The link for \eqn{\psi} and p is the logit link. Estimation is
-performed using NIMBLE.  In addition to fitting the model, generated BUGS code
-for the full model, as well as posterior draws, are returned.
+framework.  The model structure is: \deqn{z_{i} ~ Bernoulli(\psi_{i})}
+\deqn{y_{i,j} | z_{i} ~ Bernoulli(z_{i} * p_{i,j})} Where i is the number of
+sites and j the number of temporal replicates. z is a binary latent variable
+for the true observed state (occupied or not occupied). Both \eqn{\psi} and p
+can be modeled as a linear function of covariates via a linked GLM.  The link
+for \eqn{\psi} and p is the logit link. Estimation is performed using NIMBLE.
+In addition to fitting the model, generated BUGS code for the full model, as
+well as posterior draws, are returned.
 }
 \examples{
 # Simualte Occupancy Data
@@ -102,7 +103,9 @@ for (i in 1:T){y[,i] <- rbinom(n = R, size = 1, prob = z*p)}
 
 
 #Fit Model
-model <- nimble.occ(siteformula = ~ 1 + X, obsformula = ~ 1 + X + Y + X*Y, y = y, sitevars = sim.covariates, initmcmc = c(1, 1.5, 3, 5), chains = 4)
+model <- nimble.occ(siteformula = ~ 1 + X, obsformula = ~ 1 + X +
+Y + X*Y, y = y, sitevars = sim.covariates, priors = "t", initmcmc = c(.5,
+1.5, 3, 5), chains = 4)
 
 
 }
